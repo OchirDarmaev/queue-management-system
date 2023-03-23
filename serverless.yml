@@ -1,8 +1,7 @@
 org: odarmaev
 app: queue-management-system
 service: queue-management-system
-frameworkVersion: '3'
-
+frameworkVersion: "3"
 
 provider:
   name: aws
@@ -10,8 +9,10 @@ provider:
   stage: dev
   region: us-east-1
   environment:
-    QUEUES_TABLE: ${self:service}-${sls:stage}-queues
     SERVICE_POINTS_TABLE: ${self:service}-${sls:stage}-service-points
+    CLIENTS_TABLE: ${self:service}-${sls:stage}-clients
+    SERVICES_TABLE: ${self:service}-${sls:stage}-services
+    COUNTERS_TABLE: ${self:service}-${sls:stage}-counters
   iam:
     role:
       statements:
@@ -23,7 +24,7 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
-          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.QUEUES_TABLE}"
+          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.SERVICE_POINTS_TABLE}"
         - Effect: Allow
           Action:
             - dynamodb:Query
@@ -32,47 +33,90 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
-          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.SERVICE_POINTS_TABLE}"
+          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CLIENTS_TABLE}"
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.SERVICES_TABLE}"
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.COUNTERS_TABLE}"
 
 functions:
+  #ServicePoint
   createServicePoint:
-    handler: src/servicePoints/handler.createServicePoint
+    handler: src/servicePoints/servicePoints.handler
     events:
       - http:
           method: POST
           path: /servicePoints
-  deleteServicePoint:
-    handler: src/servicePoints/handler.deleteServicePoint
-    events:
-      - http:
-          method: DELETE
-          path: /servicePoints/{id}
   getAllServicePoints:
-    handler: src/servicePoints/handler.getAllServicePoints
+    handler: src/servicePoints/servicePoints.handler
     events:
       - http:
           method: GET
           path: /servicePoints
-
-  createQueue:
-    handler: src/queues/handler.createQueue
+  updateServicePoint:
+    handler: src/servicePoints/servicePoints.handler
+    events:
+      - http:
+          method: PUT
+          path: /servicePoints/{id}
+  #Service
+  createService:
+    handler: src/services/services.handler
     events:
       - http:
           method: POST
-          path: /queues
-  deleteQueue:
-    handler: src/queues/handler.deleteQueue
-    events:
-      - http:
-          method: DELETE
-          path: /queues/{id}
-  getAllQueues:
-    handler: src/queues/handler.getAllQueues
+          path: /services
+  getAllServices:
+    handler: src/services/services.handler
     events:
       - http:
           method: GET
-          path: /queues
-   
+          path: /services
+  updateService:
+    handler: src/services/services.handler
+    events:
+      - http:
+          method: PUT
+          path: /services/{id}
+  #Client
+  addNewClientToQueue:
+    handler: src/clients/clients.addNewClientToQueueHandler
+    events:
+      - http:
+          method: POST
+          path: /clients/addNewClientToQueue/{serviceId}
+  getQueue:
+    handler: src/clients/clients.getQueueHandler
+    events:
+      - http:
+          method: GET
+          path: /clients
+  updateClient:
+    handler: src/clients/clients.handler
+    events:
+      - http:
+          method: PUT
+          path: /clients/{clientId}
+  getQueuePosition:
+    handler: src/clients/clients.getQueuePositionHandler
+    events:
+      - http:
+          method: GET
+          path: /clients/queuePositionByNumber/{clientNumber}
 
 
 plugins:
@@ -80,8 +124,11 @@ plugins:
   - serverless-dynamodb-local
   - serverless-offline
 
-
 custom:
+  esbuild:
+    minify: false
+    sourcemap: linked
+    keepNames: true
   dynamodb:
     stages:
       - dev
@@ -89,39 +136,61 @@ custom:
       port: 8000
       inMemory: true
       migrate: true
-    # Comment if you don't have a DynamoDB running locally
+      # Comment if you don't have a DynamoDB running locally
       noStart: true
     migration:
       dir: offline/migrations
- 
 
 resources:
   Resources:
-    QueuesTable:
-      Type: 'AWS::DynamoDB::Table'
-      DeletionPolicy: Retain
-      Properties:
-        AttributeDefinitions:
-          -
-            AttributeName: id
-            AttributeType: S
-        KeySchema:
-          -
-            AttributeName: id
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-        TableName: ${self:provider.environment.QUEUES_TABLE}
     ServicePointsTable:
-      Type: 'AWS::DynamoDB::Table'
+      Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
       Properties:
         AttributeDefinitions:
-          -
-            AttributeName: id
+          - AttributeName: id
             AttributeType: S
         KeySchema:
-          -
-            AttributeName: id
+          - AttributeName: id
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:provider.environment.SERVICE_POINTS_TABLE}
+    ClientsTable:
+      Type: "AWS::DynamoDB::Table"
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:provider.environment.CLIENTS_TABLE}
+    ServicesTable:
+      Type: "AWS::DynamoDB::Table"
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:provider.environment.SERVICES_TABLE}
+
+
+    CountersTable:
+      Type: "AWS::DynamoDB::Table"
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+        TableName: ${self:provider.environment.COUNTERS_TABLE}
+

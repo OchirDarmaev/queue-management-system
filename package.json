@@ -4,6 +4,7 @@
   "description": "<!-- title: 'AWS NodeJS Example' description: 'This template demonstrates how to deploy a NodeJS function running on AWS Lambda using the traditional Serverless Framework.' layout: Doc framework: v3 platform: AWS language: nodeJS priority: 1 authorLink: 'https://github.com/serverless' authorName: 'Serverless, inc.' authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4' -->",
   "main": "index.js",
   "scripts": {
+    "debug": "export SLS_DEBUG=* && node --inspect node_modules/serverless/bin/serverless offline",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
@@ -18,6 +19,7 @@
     "@types/aws-sdk": "^2.7.0",
     "@types/uuid": "^9.0.1",
     "esbuild": "^0.16.17",
+    "serverless": "^3.28.1",
     "serverless-auto-swagger": "^2.12.0",
     "serverless-esbuild": "^1.41.0",
     "serverless-offline": "^12.0.4"
