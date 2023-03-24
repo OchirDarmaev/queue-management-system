@@ -10,9 +10,7 @@ provider:
   region: us-east-1
   environment:
     SERVICE_POINTS_TABLE: ${self:service}-${sls:stage}-service-points
-    CLIENTS_TABLE: ${self:service}-${sls:stage}-clients
     SERVICES_TABLE: ${self:service}-${sls:stage}-services
-    COUNTERS_TABLE: ${self:service}-${sls:stage}-counters
   iam:
     role:
       statements:
@@ -33,25 +31,7 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
-          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.CLIENTS_TABLE}"
-        - Effect: Allow
-          Action:
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
           Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.SERVICES_TABLE}"
-        - Effect: Allow
-          Action:
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
-          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.COUNTERS_TABLE}"
 
 functions:
   #ServicePoint
@@ -91,7 +71,7 @@ functions:
     events:
       - http:
           method: PUT
-          path: /services/{id}
+          path: /services/{serviceId}
   #Client
   addNewClientToQueue:
     handler: src/clients/clients.addNewClientToQueueHandler
@@ -117,7 +97,6 @@ functions:
       - http:
           method: GET
           path: /clients/queuePositionByNumber/{clientNumber}
-
 
 plugins:
   - serverless-esbuild
@@ -155,18 +134,6 @@ resources:
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:provider.environment.SERVICE_POINTS_TABLE}
-    ClientsTable:
-      Type: "AWS::DynamoDB::Table"
-      DeletionPolicy: Retain
-      Properties:
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-        TableName: ${self:provider.environment.CLIENTS_TABLE}
     ServicesTable:
       Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
@@ -174,23 +141,21 @@ resources:
         AttributeDefinitions:
           - AttributeName: id
             AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        BillingMode: PAY_PER_REQUEST
-        TableName: ${self:provider.environment.SERVICES_TABLE}
-
-
-    CountersTable:
-      Type: "AWS::DynamoDB::Table"
-      DeletionPolicy: Retain
-      Properties:
-        AttributeDefinitions:
-          - AttributeName: id
+          - AttributeName: user_id
+            AttributeType: S
+          - AttributeName: created_at
             AttributeType: S
         KeySchema:
           - AttributeName: id
             KeyType: HASH
+        GlobalSecondaryIndexes:
+          - IndexName: UserIdIndex
+            KeySchema:
+              - AttributeName: user_id
+                KeyType: HASH
+              - AttributeName: created_at
+                KeyType: RANGE
+            Projection:
+              ProjectionType: "ALL"
         BillingMode: PAY_PER_REQUEST
-        TableName: ${self:provider.environment.COUNTERS_TABLE}
-
+        TableName: ${self:provider.environment.SERVICES_TABLE}

@@ -1,6 +1,12 @@
 import { APIGatewayProxyHandler } from "aws-lambda";
-import { dynamoDB } from "../dynamoDB";
+import { ddbDocClient } from "../dynamoDB";
 import { v4 as uuidv4 } from "uuid";
+import {
+  DeleteCommand,
+  PutCommand,
+  ScanCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
 
 export const handler: APIGatewayProxyHandler = async (event, context) => {
   try {
@@ -29,9 +35,11 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
 };
 
 async function getServices() {
-  const result = await dynamoDB
-    .scan({ TableName: process.env.SERVICES_TABLE })
-    .promise();
+  const result = await ddbDocClient.send(
+    new ScanCommand({
+      TableName: process.env.SERVICES_TABLE,
+    })
+  );
   return {
     statusCode: 200,
     body: JSON.stringify(result.Items),
@@ -50,7 +58,7 @@ async function createService(event) {
     },
     ReturnValues: "ALL_OLD",
   };
-  const result = await dynamoDB.put(params).promise();
+  const result = await ddbDocClient.send(new PutCommand(params));
   return {
     statusCode: 201,
     body: JSON.stringify(result.Attributes),
@@ -58,16 +66,17 @@ async function createService(event) {
 }
 
 async function updateService(event) {
-  const { service_id, name, description } = JSON.parse(event.body);
+  const serviceId = event.pathParameters.serviceId;
+  const { name, description } = JSON.parse(event.body);
   const params = {
     TableName: process.env.SERVICES_TABLE,
-    Key: { service_id },
+    Key: { id: serviceId },
     UpdateExpression: "set #n = :n, #d = :d",
     ExpressionAttributeNames: { "#n": "name", "#d": "description" },
     ExpressionAttributeValues: { ":n": name, ":d": description },
     ReturnValues: "ALL_NEW",
   };
-  const result = await dynamoDB.update(params).promise();
+  const result = await ddbDocClient.send(new UpdateCommand(params));
   return {
     statusCode: 200,
     body: JSON.stringify(result.Attributes),
@@ -81,7 +90,7 @@ async function deleteService(event) {
     Key: { service_id },
     ConditionExpression: "attribute_exists(service_id)",
   };
-  await dynamoDB.delete(params).promise();
+  await ddbDocClient.send(new DeleteCommand(params));
   return {
     statusCode: 204,
     body: "",

@@ -1,4 +1,5 @@
-import AWS from "aws-sdk";
+import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 
 let options = {};
 // connect to local DB if running offline
@@ -8,4 +9,11 @@ if (process.env.IS_OFFLINE) {
     endpoint: "http://localhost:8000",
   };
 }
-export const dynamoDB = new AWS.DynamoDB.DocumentClient(options);
+
+const dynamoDB = new DynamoDBClient({ ...options });
+
+export const ddbDocClient = DynamoDBDocumentClient.from(dynamoDB, {
+  marshallOptions: {
+    removeUndefinedValues: true,
+  },
+}); // client is DynamoDB client
