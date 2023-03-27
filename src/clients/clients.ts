@@ -1,16 +1,28 @@
-import { PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { APIGatewayProxyHandler } from "aws-lambda";
 import { ddbDocClient } from "../dynamoDB";
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { prefixClient, prefixQueue, TableName } from "../db";
+import { ulid } from "ulid";
+import { GetItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
 const MAX_NUMBER_OF_SYMBOL_CLIENT_NUMBER = 3;
 const MAX_NUMBER_CLIENT = 999;
+
+export enum ClientStatus {
+  QUEUED = "queued",
+  SERVED = "served",
+  CANCELLED = "cancelled",
+}
 
 export const getQueueHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
   try {
-    return await getQueue();
+    const res = await getQueue();
+    return {
+      statusCode: 200,
+      body: JSON.stringify(res),
+    };
   } catch (error) {
     console.error(error);
     return {
@@ -26,7 +38,11 @@ export const addNewClientToQueueHandler: APIGatewayProxyHandler = async (
 ) => {
   try {
     const serviceId = event.pathParameters.serviceId;
-    return await addNewClientToQueue({ serviceId });
+    const res = await addNewClientToQueue({ serviceId });
+    return {
+      statusCode: 201,
+      body: JSON.stringify(res),
+    };
   } catch (error) {
     console.error(error);
     return {
@@ -36,147 +52,145 @@ export const addNewClientToQueueHandler: APIGatewayProxyHandler = async (
   }
 };
 
-// export const updateClientHandler: APIGatewayProxyHandler = async (
-//   event,
-//   context
-// ) => {
-//   try {
-//     const { clientId } = event.pathParameters;
-//     const { status } = JSON.parse(event.body);
-//     return await updateClient(clientId, status);
-//   } catch (error) {
-//     console.error(error);
-//     return {
-//       statusCode: 500,
-//       body: "Internal Server Error",
-//     };
-//   }
-// };
-
-// export const getQueuePositionHandler: APIGatewayProxyHandler = async (
-//   event,
-//   context
-// ) => {
-//   try {
-//     const { clientNumber } = event.pathParameters;
-//     const queuePositionResponse = await getQueuePosition(clientNumber);
-//     return {
-//       statusCode: 200,
-//       body: JSON.stringify(queuePositionResponse),
-//     };
-//   } catch (error) {
-//     console.error(error);
-//     return {
-//       statusCode: 500,
-//     };
-//   }
-// };
+export const getQueuePositionByClientIdHandler: APIGatewayProxyHandler = async (
+  event,
+  context
+) => {
+  try {
+    const { serviceId, clientId } = event.pathParameters;
+    const queuePositionResponse = await getQueuePositionById({
+      serviceId,
+      clientId,
+    });
+    return {
+      statusCode: 200,
+      body: JSON.stringify(queuePositionResponse),
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+    };
+  }
+};
 
 async function getQueue() {
   const result = await ddbDocClient.send(
-    new ScanCommand({ TableName: process.env.SERVICES_TABLE })
+    new QueryCommand({
+      TableName,
+      IndexName: "GSI1",
+      KeyConditionExpression: "GSI1PK = :pk",
+      ExpressionAttributeValues: {
+        ":pk": {
+          S: "QUEUE",
+        },
+      },
+    })
   );
-  return {
-    statusCode: 200,
-    body: JSON.stringify(result.Items),
-  };
+  return result.Items;
 }
 
 async function addNewClientToQueue({
   serviceId,
+  clientId,
 }: {
   serviceId: string;
+  clientId?: string;
 }): Promise<{
   serviceId: string;
   clientNumber: string;
   numberInQueue: number;
 }> {
-  const params = {
-    TableName: process.env.SERVICES_TABLE,
-    Key: {
-      id: serviceId,
-    },
+  const id = clientId ?? ulid();
+  await ddbDocClient.send(
+    new TransactWriteCommand({
+      TransactItems: [
+        {
+          Put: {
+            TableName,
+            Item: {
+              PK: prefixQueue + serviceId,
+              SK: prefixClient + id,
+              client_status: ClientStatus.QUEUED,
+              GSI1PK: "QUEUE",
+            },
+            ConditionExpression:
+              "attribute_not_exists(PK) AND attribute_not_exists(SK)",
+          },
+        },
+        {
+          Update: {
+            TableName,
+            Key: {
+              PK: prefixQueue + serviceId,
+              SK: prefixQueue + serviceId,
+            },
+            UpdateExpression: "ADD clientsCount :one",
+            ExpressionAttributeValues: {
+              ":one": 1,
+            },
+            ReturnValuesOnConditionCheckFailure: "ALL_OLD",
+          },
+        },
+      ],
+    })
+  );
 
-    UpdateExpression: "ADD #cc :incr ",
-    ExpressionAttributeNames: { "#cc": "clients_count" },
-    ExpressionAttributeValues: { ":incr": 1 },
+  const result = await ddbDocClient.send(
+    new GetItemCommand({
+      TableName,
+      Key: {
+        PK: {
+          S: prefixQueue + serviceId,
+        },
+        SK: {
+          S: prefixQueue + serviceId,
+        },
+      },
+    })
+  );
 
-    // //     user_id: "1", created_at
-    // UpdateExpression: "set #u = :u, #c = :c",
-    // ExpressionAttributeNames: { "#u": "user_id", "#c": "created_at" },
-    // ExpressionAttributeValues: {
-    //   ":u": null,
-    //   ":c": new Date().toISOString(),
-    // },
-    ProjectionExpression: "clients_count",
-    ReturnValues: "ALL_NEW",
-  };
-  const result = await ddbDocClient.send(new UpdateCommand(params));
-  const clientNumber = result.Attributes.clients_count;
+  console.log("result", result);
 
-  // return {
-  //   serviceId,
-  //   clientNumber,
-  //   numberInQueue: clientNumber,
-  // };
-
-  const params2 = {
-    TableName: process.env.CLIENTS_TABLE,
-    Item: {
-      id: serviceId,
-      client_number: clientNumber.toString(),
-      created_at: new Date().toISOString(),
-      status: "queued",
-    },
-  };
-  await ddbDocClient.send(new PutCommand(params2));
   return {
     serviceId,
-    clientNumber,
-    // stubbed
-    numberInQueue: 0,
+    clientNumber: id,
+    numberInQueue: Number(result.Item.clientsCount.N),
   };
 }
 
-// async function updateClient(clientId: string, status: "served" | "cancelled") {
-//   // const params = {
-//   //   TableName: process.env.CLIENTS_TABLE,
-//   //   Key: { clientId },
-//   //   UpdateExpression: "set #s = :s",
-//   //   ExpressionAttributeNames: { "#s": "status" },
-//   //   ExpressionAttributeValues: { ":s": status },
-//   //   ReturnValues: "ALL_NEW",
-//   // };
-//   // const result = await dynamoDB.update(params).promise();
-//   // return {
-//   //   statusCode: 200,
-//   //   body: JSON.stringify(result.Attributes),
-//   // };
-// }
+async function getQueuePositionById({
+  serviceId,
+  clientId,
+}: {
+  serviceId: string;
+  clientId: string;
+}): Promise<{
+  clientId: string;
+  queuePosition: number;
+}> {
+  const result = await ddbDocClient.send(
+    new QueryCommand({
+      TableName,
+      KeyConditionExpression: "PK = :pk AND SK <= :sk",
+      FilterExpression: "client_status = :client_status",
+      ExpressionAttributeValues: {
+        ":pk": {
+          S: prefixQueue + serviceId,
+        },
+        ":sk": {
+          S: prefixClient + clientId,
+        },
+        ":client_status": {
+          S: ClientStatus.QUEUED,
+        },
+      },
+      Select: "COUNT",
+    })
+  );
 
-// async function getQueuePosition(clientNumber: string): Promise<{
-//   clientNumber: string;
-//   queuePosition: string;
-// }> {
-//   // const result = await dynamoDB
-//   //   .scan({
-//   //     TableName: process.env.CLIENTS_TABLE,
-//   //     FilterExpression: "#s = :s and #c <= :c and #cn < :cn",
-//   //     ExpressionAttributeNames: {
-//   //       "#s": "status",
-//   //       "#c": "created_at",
-//   //       "#cn": "client_number",
-//   //     },
-//   //     ExpressionAttributeValues: {
-//   //       ":s": "queued",
-//   //       ":c": new Date().toISOString(),
-//   //       ":cn": clientNumber,
-//   //     },
-//   //   })
-//   //   .promise();
-
-//   // return {
-//   //   clientNumber,
-//   //   queuePosition: result.Count?.toString() || "0",
-//   // };
-// }
+  return {
+    clientId,
+    queuePosition: result.Count,
+  };
+}

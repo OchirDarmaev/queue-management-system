@@ -1,12 +1,14 @@
 import { APIGatewayProxyHandler } from "aws-lambda";
 import { ddbDocClient } from "../dynamoDB";
-import { v4 as uuidv4 } from "uuid";
+import { ulid } from "ulid";
+
 import {
   DeleteCommand,
   PutCommand,
   ScanCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { prefixService, TableName } from "../db";
 
 export const handler: APIGatewayProxyHandler = async (event, context) => {
   try {
@@ -37,7 +39,7 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
 async function getServices() {
   const result = await ddbDocClient.send(
     new ScanCommand({
-      TableName: process.env.SERVICES_TABLE,
+      TableName,
     })
   );
   return {
@@ -48,11 +50,12 @@ async function getServices() {
 
 async function createService(event) {
   const { name, description } = JSON.parse(event.body);
-  const id = uuidv4();
+  const id = ulid();
   const params = {
-    TableName: process.env.SERVICES_TABLE,
+    TableName,
     Item: {
-      id,
+      PK: prefixService + id,
+      SK: prefixService + id,
       name,
       description,
     },
@@ -69,8 +72,9 @@ async function updateService(event) {
   const serviceId = event.pathParameters.serviceId;
   const { name, description } = JSON.parse(event.body);
   const params = {
-    TableName: process.env.SERVICES_TABLE,
-    Key: { id: serviceId },
+    TableName,
+    Key: { PK: prefixService + serviceId, SK: prefixService + serviceId },
+
     UpdateExpression: "set #n = :n, #d = :d",
     ExpressionAttributeNames: { "#n": "name", "#d": "description" },
     ExpressionAttributeValues: { ":n": name, ":d": description },
@@ -84,10 +88,10 @@ async function updateService(event) {
 }
 
 async function deleteService(event) {
-  const { service_id } = JSON.parse(event.body);
+  const { serviceId: serviceId } = JSON.parse(event.body);
   const params = {
-    TableName: process.env.SERVICES_TABLE,
-    Key: { service_id },
+    TableName,
+    Key: { PK: prefixService + serviceId, SK: prefixService + serviceId },
     ConditionExpression: "attribute_exists(service_id)",
   };
   await ddbDocClient.send(new DeleteCommand(params));

@@ -14,7 +14,7 @@
     "@aws-sdk/lib-dynamodb": "^3.298.0",
     "aws-lambda": "^1.0.7",
     "serverless-dynamodb-local": "^0.2.40",
-    "uuid": "^9.0.0"
+    "ulid": "^2.3.0"
   },
   "devDependencies": {
     "@types/uuid": "^9.0.1",

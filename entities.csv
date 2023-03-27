@@ -1,0 +1,4 @@
+Entity,PK,SK,GSI1PK,GSI2SK,
+Service,SERVICE#{ServiceId},SERVICE#{ServiceId},,,
+Service Point,SERVICE_POINT#{servicePointId},SERVICE_POINT#{servicePointId},,,
+Queue,SQ#{ServiceId},QUEUE#{timestamp},,,

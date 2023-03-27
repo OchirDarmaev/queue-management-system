@@ -9,8 +9,7 @@ provider:
   stage: dev
   region: us-east-1
   environment:
-    SERVICE_POINTS_TABLE: ${self:service}-${sls:stage}-service-points
-    SERVICES_TABLE: ${self:service}-${sls:stage}-services
+    ONE_TABLE: ${self:service}-${sls:stage}
   iam:
     role:
       statements:
@@ -22,16 +21,7 @@ provider:
             - dynamodb:PutItem
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
-          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.SERVICE_POINTS_TABLE}"
-        - Effect: Allow
-          Action:
-            - dynamodb:Query
-            - dynamodb:Scan
-            - dynamodb:GetItem
-            - dynamodb:PutItem
-            - dynamodb:UpdateItem
-            - dynamodb:DeleteItem
-          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.SERVICES_TABLE}"
+          Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ONE_TABLE}"
 
 functions:
   #ServicePoint
@@ -72,13 +62,26 @@ functions:
       - http:
           method: PUT
           path: /services/{serviceId}
-  #Client
+  deleteService:
+    handler: src/services/services.handler
+    events:
+      - http:
+          method: DELETE
+          path: /services/{serviceId}
+
   addNewClientToQueue:
     handler: src/clients/clients.addNewClientToQueueHandler
     events:
       - http:
           method: POST
-          path: /clients/addNewClientToQueue/{serviceId}
+          path: /services/{serviceId}/clients
+  getQueuePosition:
+    handler: src/clients/clients.getQueuePositionByClientIdHandler
+    events:
+      - http:
+          method: GET
+          path: /services/{serviceId}/clients/{clientId}/queuePosition
+  #Client
   getQueue:
     handler: src/clients/clients.getQueueHandler
     events:
@@ -91,12 +94,7 @@ functions:
       - http:
           method: PUT
           path: /clients/{clientId}
-  getQueuePosition:
-    handler: src/clients/clients.getQueuePositionHandler
-    events:
-      - http:
-          method: GET
-          path: /clients/queuePositionByNumber/{clientNumber}
+ 
 
 plugins:
   - serverless-esbuild
@@ -122,40 +120,19 @@ custom:
 
 resources:
   Resources:
-    ServicePointsTable:
+    OneTable:
       Type: "AWS::DynamoDB::Table"
       DeletionPolicy: Retain
       Properties:
         AttributeDefinitions:
-          - AttributeName: id
+          - AttributeName: PK
+            AttributeType: S
+          - AttributeName: SK
             AttributeType: S
         KeySchema:
-          - AttributeName: id
+          - AttributeName: PK
             KeyType: HASH
+          - AttributeName: SK
+            KeyType: RANGE
         BillingMode: PAY_PER_REQUEST
-        TableName: ${self:provider.environment.SERVICE_POINTS_TABLE}
-    ServicesTable:
-      Type: "AWS::DynamoDB::Table"
-      DeletionPolicy: Retain
-      Properties:
-        AttributeDefinitions:
-          - AttributeName: id
-            AttributeType: S
-          - AttributeName: user_id
-            AttributeType: S
-          - AttributeName: created_at
-            AttributeType: S
-        KeySchema:
-          - AttributeName: id
-            KeyType: HASH
-        GlobalSecondaryIndexes:
-          - IndexName: UserIdIndex
-            KeySchema:
-              - AttributeName: user_id
-                KeyType: HASH
-              - AttributeName: created_at
-                KeyType: RANGE
-            Projection:
-              ProjectionType: "ALL"
-        BillingMode: PAY_PER_REQUEST
-        TableName: ${self:provider.environment.SERVICES_TABLE}
+        TableName: ${self:provider.environment.ONE_TABLE}

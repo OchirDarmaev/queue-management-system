@@ -1,0 +1,11 @@
+Accress patern,Target,Parameters,Notes
+CRUD service,Service Table,"Service name, Service description",
+CRUD service point,Service Point Table,"Service point serial number, Service point name, Service point status (active/inactive)",
+Mark client as served,Queue Table,Client ID,"Update status client to served,"
+Mark client as not shown - Client Table,Queue Table,Client ID,"if the client is in pending status, the client can be become skipped"
+Update service point status,Service Point Table,"Service point serial number, status (pending, service, closed, skipped)","Transaction: update client status, update service point status"
+Get full queue info,"Client table, Service Point Table",count of list =10,"Query operation: the last calls to service points, the queue, "
+Get number of people in the queue,Client table,S_ID,"Query operation, internal call"
+Add client to queue,Client table,S_ID,
+How many people in queue before client?,Client table,"S_ID, Client ID",Query operation
+Assign a service to a service point - Service Point Table,"Service Point Table, Service Table","SP_ID, S_ID",The administrator assigns a service to a service point by updating the service point record with the corresponding service name.
