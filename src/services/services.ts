@@ -9,6 +9,7 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { prefixService, TableName } from "../db";
+import { QueryCommand } from "@aws-sdk/client-dynamodb";
 
 export const handler: APIGatewayProxyHandler = async (event, context) => {
   try {
@@ -38,8 +39,15 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
 
 async function getServices() {
   const result = await ddbDocClient.send(
-    new ScanCommand({
+    new QueryCommand({
       TableName,
+      IndexName: "GSI1",
+      KeyConditionExpression: "GSI1PK = :pk",
+      ExpressionAttributeValues: {
+        ":pk": {
+          S: "SERVICE",
+        },
+      },
     })
   );
   return {
@@ -58,6 +66,7 @@ async function createService(event) {
       SK: prefixService + id,
       name,
       description,
+      GSI1PK: "SERVICE",
     },
     ReturnValues: "ALL_OLD",
   };
