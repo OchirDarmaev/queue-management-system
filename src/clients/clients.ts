@@ -4,8 +4,6 @@ import { ddbDocClient } from "../dynamoDB";
 import { prefixClient, prefixQueue, TableName } from "../db";
 import { ulid } from "ulid";
 import { GetItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
-const MAX_NUMBER_OF_SYMBOL_CLIENT_NUMBER = 3;
-const MAX_NUMBER_CLIENT = 999;
 
 export enum ClientStatus {
   QUEUED = "queued",
@@ -98,7 +96,7 @@ async function addNewClientToQueue({
   clientId?: string;
 }): Promise<{
   serviceId: string;
-  clientNumber: string;
+  clientId: string;
   numberInQueue: number;
 }> {
   const id = clientId ?? ulid();
@@ -118,44 +116,15 @@ async function addNewClientToQueue({
               "attribute_not_exists(PK) AND attribute_not_exists(SK)",
           },
         },
-        {
-          Update: {
-            TableName,
-            Key: {
-              PK: prefixQueue + serviceId,
-              SK: prefixQueue + serviceId,
-            },
-            UpdateExpression: "ADD clientsCount :one",
-            ExpressionAttributeValues: {
-              ":one": 1,
-            },
-            ReturnValuesOnConditionCheckFailure: "ALL_OLD",
-          },
-        },
       ],
     })
   );
 
-  const result = await ddbDocClient.send(
-    new GetItemCommand({
-      TableName,
-      Key: {
-        PK: {
-          S: prefixQueue + serviceId,
-        },
-        SK: {
-          S: prefixQueue + serviceId,
-        },
-      },
-    })
-  );
-
-  console.log("result", result);
-
+  const numberInQueue = await getQueuePositionById({ serviceId, clientId: id });
   return {
     serviceId,
-    clientNumber: id,
-    numberInQueue: Number(result.Item.clientsCount.N),
+    clientId: id,
+    numberInQueue: numberInQueue.numberInQueue,
   };
 }
 
@@ -167,7 +136,7 @@ async function getQueuePositionById({
   clientId: string;
 }): Promise<{
   clientId: string;
-  queuePosition: number;
+  numberInQueue: number;
 }> {
   const result = await ddbDocClient.send(
     new QueryCommand({
@@ -191,6 +160,6 @@ async function getQueuePositionById({
 
   return {
     clientId,
-    queuePosition: result.Count,
+    numberInQueue: result.Count,
   };
 }

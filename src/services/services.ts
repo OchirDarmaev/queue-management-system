@@ -59,21 +59,22 @@ async function getServices() {
 async function createService(event) {
   const { name, description } = JSON.parse(event.body);
   const id = ulid();
+  const item = {
+    PK: prefixService + id,
+    SK: prefixService + id,
+    name,
+    description,
+    GSI1PK: "SERVICE",
+  };
   const params = {
     TableName,
-    Item: {
-      PK: prefixService + id,
-      SK: prefixService + id,
-      name,
-      description,
-      GSI1PK: "SERVICE",
-    },
+    Item: item,
     ReturnValues: "ALL_OLD",
   };
   const result = await ddbDocClient.send(new PutCommand(params));
   return {
     statusCode: 201,
-    body: JSON.stringify(result.Attributes),
+    body: JSON.stringify(item),
   };
 }
 
