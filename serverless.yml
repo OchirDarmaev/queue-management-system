@@ -26,23 +26,30 @@ provider:
 functions:
   #ServicePoint
   createServicePoint:
-    handler: src/servicePoints/servicePoints.handler
+    handler: src/servicePoints/servicePoints.createServicePointHandler
     events:
       - http:
           method: POST
           path: /servicePoints
-  getAllServicePoints:
-    handler: src/servicePoints/servicePoints.handler
+  getServicePoint:
+    handler: src/servicePoints/servicePoints.getServicePointHandler
+    events:
+       - http:
+          method: GET
+          path: /servicePoints/{servicePointId}
+  getServicePoints:
+    handler: src/servicePoints/servicePoints.getServicePointsHandler
     events:
       - http:
           method: GET
           path: /servicePoints
   updateServicePoint:
-    handler: src/servicePoints/servicePoints.handler
+    handler: src/servicePoints/servicePoints.updateServicePointHandler
     events:
       - http:
           method: PUT
-          path: /servicePoints/{id}
+          path: /servicePoints/{servicePointId}
+  
   #Service
   createService:
     handler: src/services/services.handler
@@ -130,6 +137,9 @@ resources:
             AttributeType: "S"
           - AttributeName: "GSI1PK"
             AttributeType: "S"
+          - AttributeName: "GSI1SK"
+            AttributeType: "S"
+
         KeySchema:
           - AttributeName: PK
             KeyType: HASH
@@ -140,6 +150,8 @@ resources:
             KeySchema:
               - AttributeName: GSI1PK
                 KeyType: HASH
+              - AttributeName: GSI1SK
+                KeyType: RANGE
             Projection:
               ProjectionType: "ALL"
         BillingMode: PAY_PER_REQUEST

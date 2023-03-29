@@ -1,23 +1,35 @@
 import { APIGatewayProxyHandler } from "aws-lambda";
-import { v4 as uuidv4 } from "uuid";
 import { ddbDocClient } from "../dynamoDB";
-import { ScanCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  BatchGetCommand,
+  GetCommand,
+  QueryCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
+import { ulid } from "ulid";
+import { prefixService, prefixServicePoint, TableName } from "../db";
+import {
+  BatchGetItemCommand,
+  TransactWriteItemsCommand,
+  UpdateItemCommand,
+} from "@aws-sdk/client-dynamodb";
 
-export const handler: APIGatewayProxyHandler = async (event, context) => {
+export enum ServicePointStatus {
+  ACTIVE = "active",
+  INACTIVE = "inactive",
+}
+
+export const createServicePointHandler: APIGatewayProxyHandler = async (
+  event,
+  context
+) => {
   try {
-    switch (event.httpMethod) {
-      case "GET":
-        return await getServicePoints();
-      case "POST":
-        return await createServicePoint(event);
-      case "PUT":
-        return await updateServicePoint(event);
-      default:
-        return {
-          statusCode: 405,
-          body: "Method Not Allowed",
-        };
-    }
+    const { serviceIds, name, description } = JSON.parse(event.body);
+    const res = await createServicePoint({ serviceIds, name, description });
+    return {
+      statusCode: 201,
+      body: JSON.stringify(res),
+    };
   } catch (error) {
     console.error(error);
     return {
@@ -27,79 +39,216 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
   }
 };
 
-const TableName = process.env.SERVICE_POINTS_TABLE;
+export const getServicePointHandler: APIGatewayProxyHandler = async (
+  event,
+  context
+) => {
+  try {
+    const { servicePointId } = event.pathParameters;
+    const res = await getServicePoint({ servicePointId });
+    return {
+      statusCode: 200,
+      body: JSON.stringify(res),
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      body: "Internal Server Error",
+    };
+  }
+};
+
+export const getServicePointsHandler: APIGatewayProxyHandler = async (
+  event,
+  context
+) => {
+  try {
+    const res = await getServicePoints();
+    return {
+      statusCode: 200,
+      body: JSON.stringify(res),
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      body: "Internal Server Error",
+    };
+  }
+};
+
+export const updateServicePointHandler: APIGatewayProxyHandler = async (
+  event,
+  context
+) => {
+  try {
+    const { servicePointId } = event.pathParameters;
+    const { serviceIds, name, description, status } = JSON.parse(event.body);
+    const res = await updateServicePoint({
+      servicePointId,
+      serviceIds,
+      name,
+      description,
+      status,
+    });
+    return {
+      statusCode: 200,
+      body: JSON.stringify(res),
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      body: "Internal Server Error",
+    };
+  }
+};
+
 async function getServicePoints() {
   const result = await ddbDocClient.send(
-    new ScanCommand({
+    new QueryCommand({
       TableName,
+      KeyConditionExpression: "PK = :pk",
+      ExpressionAttributeValues: {
+        ":pk": prefixServicePoint,
+      },
     })
   );
-  return {
-    statusCode: 200,
-    body: JSON.stringify(result.Items),
-  };
+  const keys = result.Items.map((item) => ({
+    PK: item.SK,
+    SK: item.SK,
+  }));
+  const servicePoints = await ddbDocClient.send(
+    new BatchGetCommand({
+      RequestItems: {
+        [TableName]: {
+          Keys: keys,
+        },
+      },
+    })
+  );
+  return servicePoints.Responses[TableName];
 }
 
 async function createServicePoint(event) {
-  const { name, description } = JSON.parse(event.body);
-  const servicePointId = uuidv4();
-  const params = {
-    TableName,
-    Item: {
-      id: servicePointId,
-      name,
-      description,
-      status: "active",
-    },
-  };
-  const result = await ddbDocClient.send(new PutCommand(params));
+  const { name, description, servicePointId } = JSON.parse(event.body);
+  const pk = servicePointId ?? ulid();
+
+  await ddbDocClient.send(
+    new TransactWriteItemsCommand({
+      TransactItems: [
+        {
+          Put: {
+            TableName,
+            Item: {
+              PK: {
+                S: prefixServicePoint + pk,
+              },
+              SK: {
+                S: prefixServicePoint + pk,
+              },
+              servicePointName: {
+                S: name,
+              },
+              description: {
+                S: description,
+              },
+              serviceIds: {
+                L: [],
+              },
+            },
+            ConditionExpression: "attribute_not_exists(PK)",
+          },
+        },
+        {
+          Put: {
+            TableName,
+            Item: {
+              PK: {
+                S: prefixServicePoint,
+              },
+              SK: {
+                S: prefixServicePoint + pk,
+              },
+            },
+          },
+        },
+      ],
+    })
+  );
+
   return {
-    statusCode: 201,
-    body: JSON.stringify(result.Attributes),
+    id: pk,
+    name,
+    description,
   };
 }
 
-async function updateServicePoint(event) {
-  const { id } = event.pathParameters;
-  const { name, description, status } = JSON.parse(event.body);
-  const params = {
-    TableName,
-    Key: { id },
-    UpdateExpression: "set #n = :n, #d = :d",
-    ExpressionAttributeNames: {
-      "#n": "name",
-      "#d": "description",
-    },
-    ExpressionAttributeValues: { ":n": name, ":d": description, },
-    ReturnValues: "ALL_NEW",
-  };
-  // const result = await ddbDocClient.update(params).promise();
-  const result = await ddbDocClient.send(new UpdateCommand(params));
-  return {
-    statusCode: 200,
-    body: JSON.stringify(result.Attributes),
-  };
+async function getServicePoint({ servicePointId }: { servicePointId: string }) {
+  const result = await ddbDocClient.send(
+    new GetCommand({
+      TableName,
+      Key: {
+        PK: prefixServicePoint + servicePointId,
+        SK: prefixServicePoint + servicePointId,
+      },
+    })
+  );
+  return result.Item;
 }
 
-// async function updateServicePoint(event) {
-//   const { id } = event.pathParameters;
-//   const { name, description, status } = JSON.parse(event.body);
-//   const params = {
-//     TableName,
-//     Key: { id },
-//     UpdateExpression: "set #n = :n, #d = :d, #s = :s",
-//     ExpressionAttributeNames: {
-//       "#n": "name",
-//       "#d": "description",
-//       "#s": "status",
-//     },
-//     ExpressionAttributeValues: { ":n": name, ":d": description, ":s": status },
-//     ReturnValues: "ALL_NEW",
-//   };
-//   // const result = await ddbDocClient.update(params).promise();
-//   const result = await ddbDocClient.send(new UpdateCommand(params));
-//   return {
-//     statusCode: 200,
-//     body: JSON.stringify(result.Attributes),
-//   };
-// }
+async function updateServicePoint({
+  servicePointId,
+  serviceIds,
+  name,
+  description,
+  status,
+}: {
+  servicePointId: string;
+  name: string;
+  description: string;
+  status: ServicePointStatus;
+  serviceIds: string[];
+}) {
+  if (serviceIds.length) {
+    const result1 = await ddbDocClient.send(
+      new BatchGetCommand({
+        RequestItems: {
+          [TableName]: {
+            Keys: serviceIds.map((id) => ({
+              PK: prefixService + id,
+              SK: prefixService + id,
+            })),
+          },
+        },
+      })
+    );
+
+    if (result1.Responses[TableName].length !== serviceIds.length) {
+      throw new Error("Service not found");
+    }
+  }
+
+  const result = await ddbDocClient.send(
+    new UpdateCommand({
+      TableName,
+      Key: {
+        PK: prefixServicePoint + servicePointId,
+        SK: prefixServicePoint + servicePointId,
+      },
+      UpdateExpression:
+        "SET serviceIds = :serviceIds, servicePointName = :name, description = :description, servicePointStatus = :status",
+      ExpressionAttributeValues: {
+        ":serviceIds": serviceIds,
+        ":name": name,
+        ":description": description,
+        ":status": status,
+      },
+      ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  return result.Attributes;
+}

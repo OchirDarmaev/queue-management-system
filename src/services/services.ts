@@ -3,21 +3,37 @@ import { ddbDocClient } from "../dynamoDB";
 import { ulid } from "ulid";
 
 import {
+  BatchGetCommand,
   DeleteCommand,
   PutCommand,
   ScanCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { prefixService, TableName } from "../db";
-import { QueryCommand } from "@aws-sdk/client-dynamodb";
+import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import {
+  BatchGetItemCommand,
+  TransactWriteItemsCommand,
+} from "@aws-sdk/client-dynamodb";
 
 export const handler: APIGatewayProxyHandler = async (event, context) => {
   try {
     switch (event.httpMethod) {
-      case "GET":
-        return await getServices();
-      case "POST":
-        return await createService(event);
+      case "GET": {
+        const result = await getServices();
+        return {
+          statusCode: 200,
+          body: JSON.stringify(result),
+        };
+      }
+      case "POST": {
+        const res = await createService(event);
+
+        return {
+          statusCode: 201,
+          body: JSON.stringify(res),
+        };
+      }
       case "PUT":
         return await updateService(event);
       case "DELETE":
@@ -41,40 +57,74 @@ async function getServices() {
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-      IndexName: "GSI1",
-      KeyConditionExpression: "GSI1PK = :pk",
+      KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: {
-        ":pk": {
-          S: "SERVICE",
+        ":pk": prefixService,
+      },
+    })
+  );
+  const keys = result.Items.map((item) => ({
+    PK: item.SK,
+    SK: item.SK,
+  }));
+  const services = await ddbDocClient.send(
+    new BatchGetCommand({
+      RequestItems: {
+        [TableName]: {
+          Keys: keys,
         },
       },
     })
   );
-  return {
-    statusCode: 200,
-    body: JSON.stringify(result.Items),
-  };
+  return services.Responses[TableName];
 }
 
 async function createService(event) {
   const { name, description } = JSON.parse(event.body);
   const id = ulid();
-  const item = {
-    PK: prefixService + id,
-    SK: prefixService + id,
-    name,
-    description,
-    GSI1PK: "SERVICE",
-  };
-  const params = {
-    TableName,
-    Item: item,
-    ReturnValues: "ALL_OLD",
-  };
-  const result = await ddbDocClient.send(new PutCommand(params));
+  await ddbDocClient.send(
+    new TransactWriteItemsCommand({
+      TransactItems: [
+        {
+          Put: {
+            TableName,
+            Item: {
+              PK: {
+                S: prefixService + id,
+              },
+              SK: {
+                S: prefixService + id,
+              },
+              name: {
+                S: name,
+              },
+              description: {
+                S: description,
+              },
+            },
+          },
+        },
+        {
+          Put: {
+            TableName,
+            Item: {
+              PK: {
+                S: prefixService,
+              },
+              SK: {
+                S: prefixService + id,
+              },
+            },
+          },
+        },
+      ],
+    })
+  );
+
   return {
-    statusCode: 201,
-    body: JSON.stringify(item),
+    id: id,
+    name: name,
+    description: description,
   };
 }
 
@@ -88,6 +138,7 @@ async function updateService(event) {
     UpdateExpression: "set #n = :n, #d = :d",
     ExpressionAttributeNames: { "#n": "name", "#d": "description" },
     ExpressionAttributeValues: { ":n": name, ":d": description },
+    ConditionExpression: "attribute_exists(PK)",
     ReturnValues: "ALL_NEW",
   };
   const result = await ddbDocClient.send(new UpdateCommand(params));
