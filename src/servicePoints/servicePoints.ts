@@ -98,7 +98,7 @@ export const updateServicePointHandler: APIGatewayProxyHandler = async (
       serviceIds,
       name,
       description,
-      status,
+      servicePointStatus: status,
     });
     return {
       statusCode: 200,
@@ -191,6 +191,9 @@ async function createServicePoint({
               description: {
                 S: description,
               },
+              servicePointStatus: {
+                S: ServicePointStatus.INACTIVE,
+              },
               serviceIds: {
                 L:
                   serviceIds.map((x) => ({
@@ -243,12 +246,12 @@ async function updateServicePoint({
   serviceIds,
   name,
   description,
-  status,
+  servicePointStatus: servicePointStatus,
 }: {
   servicePointId: string;
   name: string;
   description: string;
-  status: ServicePointStatus;
+  servicePointStatus: ServicePointStatus;
   serviceIds: string[];
 }) {
   if (serviceIds.length) {
@@ -278,12 +281,12 @@ async function updateServicePoint({
         SK: prefixServicePoint + servicePointId,
       },
       UpdateExpression:
-        "SET serviceIds = :serviceIds, servicePointName = :name, description = :description, servicePointStatus = :status",
+        "SET serviceIds = :serviceIds, servicePointName = :name, description = :description, servicePointStatus = :servicePointStatus",
       ExpressionAttributeValues: {
         ":serviceIds": serviceIds,
         ":name": name,
         ":description": description,
-        ":status": status,
+        ":servicePointStatus": servicePointStatus,
       },
       ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
       ReturnValues: "ALL_NEW",

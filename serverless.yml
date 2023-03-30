@@ -106,7 +106,12 @@ functions:
       - http:
           method: GET
           path: "/queue/{queueId}"
-  
+  getQueueStatus:
+    handler: src/queue/queue.getQueueStatusHandler
+    events:
+      - http:
+          method: GET
+          path: "/queue/status"
 
 plugins:
   - serverless-esbuild
