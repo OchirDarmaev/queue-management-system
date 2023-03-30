@@ -1,7 +1,6 @@
 import { QueuePriority, QueueStatus } from "./queue/queue";
 
 export const prefixService = "S#";
-export const prefixClient = "C#";
 const prefixServiceQueue = "SQ#";
 export const prefixQueue = "Q#";
 export const prefixQueueStatus = "Q_STATUS#";
@@ -11,13 +10,13 @@ export const buildQueueKey = (serviceId: string) =>
 export const buildQueueSK = ({
   status,
   priority,
-  date,
+  dateISOString,
 }: {
   status: QueueStatus;
   priority: QueuePriority;
-  date: Date;
+  dateISOString: string;
 }) =>
-  `${prefixQueueStatus}${status}Q_PRIORITY#${priority}#Q_DATE${date.toISOString()}`;
+  `${prefixQueueStatus}${status}Q_PRIORITY#${priority}#Q_DATE${dateISOString}`;
 
 export const prefixServicePoint = "SP#";
 if (!process.env.ONE_TABLE) {
