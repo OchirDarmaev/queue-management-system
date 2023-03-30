@@ -34,7 +34,7 @@ functions:
   getServicePoint:
     handler: src/servicePoints/servicePoints.getServicePointHandler
     events:
-       - http:
+      - http:
           method: GET
           path: /servicePoints/{servicePointId}
   getServicePoints:
@@ -49,7 +49,13 @@ functions:
       - http:
           method: PUT
           path: /servicePoints/{servicePointId}
-  
+  removeServicePoint:
+    handler: src/servicePoints/servicePoints.removeServicePointHandler
+    events:
+      - http:
+          method: DELETE
+          path: /servicePoints/{servicePointId}
+
   #Service
   createService:
     handler: src/services/services.handler
@@ -75,32 +81,32 @@ functions:
       - http:
           method: DELETE
           path: /services/{serviceId}
-
-  addNewClientToQueue:
-    handler: src/clients/clients.addNewClientToQueueHandler
+  # queue
+  createQueueItem:
+    handler: src/queue/queue.createQueueItemHandler
     events:
       - http:
           method: POST
-          path: /services/{serviceId}/clients
-  getQueuePosition:
-    handler: src/clients/clients.getQueuePositionByClientIdHandler
+          path: "/services/{serviceId}/queue"
+  getQueueItems:
+    handler: src/queue/queue.getQueueItemsHandler
     events:
       - http:
           method: GET
-          path: /services/{serviceId}/clients/{clientId}/queuePosition
-  #Client
-  getQueue:
-    handler: src/clients/clients.getQueueHandler
-    events:
-      - http:
-          method: GET
-          path: /clients
-  updateClient:
-    handler: src/clients/clients.handler
+          path: "/services/{serviceId}/queue"
+  updateQueueItem:
+    handler: src/queue/queue.updateQueueItemHandler
     events:
       - http:
           method: PUT
-          path: /clients/{clientId}
+          path: "/queue/{queueId}"
+  getQueueItem:
+    handler: src/queue/queue.getQueueItemHandler
+    events:
+      - http:
+          method: GET
+          path: "/queue/{queueId}"
+  
 
 plugins:
   - serverless-esbuild

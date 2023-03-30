@@ -9,3 +9,9 @@ Get number of people in the queue,Client table,S_ID,"Query operation, internal c
 Add client to queue,Client table,S_ID,
 How many people in queue before client?,Client table,"S_ID, Client ID",Query operation
 Assign a service to a service point - Service Point Table,"Service Point Table, Service Table","SP_ID, S_ID",The administrator assigns a service to a service point by updating the service point record with the corresponding service name.
+"Add item in the queue: PutItem operation with the appropriate PK, SK, and id.",,,
+"Get the current position in the queue. Get item by id and get postion",,,
+"Change the position item in the queue (reordering in case some client is an old man): Retrieve the item, remove it from the queue, update the priority and SK, and add the item back to the queue.",,,
+"Update status: Retrieve the item, remove it from the queue, update the PK and SK, and add the item back to the queue with the updated status.",,,
+"Get the first queued item: Query operation with PK = 'STATUS#queued' and Limit = 1.",,,
+"Get all items that are queued or pending: Perform two Query operations with PK = 'STATUS#queued' and PK = 'STATUS#pending', then combine the results.",,,

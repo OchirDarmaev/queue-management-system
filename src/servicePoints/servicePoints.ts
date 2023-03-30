@@ -2,6 +2,7 @@ import { APIGatewayProxyHandler } from "aws-lambda";
 import { ddbDocClient } from "../dynamoDB";
 import {
   BatchGetCommand,
+  DeleteCommand,
   GetCommand,
   QueryCommand,
   UpdateCommand,
@@ -24,8 +25,15 @@ export const createServicePointHandler: APIGatewayProxyHandler = async (
   context
 ) => {
   try {
-    const { serviceIds, name, description } = JSON.parse(event.body);
-    const res = await createServicePoint({ serviceIds, name, description });
+    const { servicePointId, serviceIds, name, description } = JSON.parse(
+      event.body
+    );
+    const res = await createServicePoint({
+      servicePointId,
+      serviceIds,
+      name,
+      description,
+    });
     return {
       statusCode: 201,
       body: JSON.stringify(res),
@@ -105,6 +113,26 @@ export const updateServicePointHandler: APIGatewayProxyHandler = async (
   }
 };
 
+export const deleteServicePointHandler: APIGatewayProxyHandler = async (
+  event,
+  context
+) => {
+  try {
+    const { servicePointId } = event.pathParameters;
+    const res = await deleteServicePoint({ servicePointId });
+    return {
+      statusCode: 200,
+      body: JSON.stringify(res),
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      body: "Internal Server Error",
+    };
+  }
+};
+
 async function getServicePoints() {
   const result = await ddbDocClient.send(
     new QueryCommand({
@@ -131,8 +159,17 @@ async function getServicePoints() {
   return servicePoints.Responses[TableName];
 }
 
-async function createServicePoint(event) {
-  const { name, description, servicePointId } = JSON.parse(event.body);
+async function createServicePoint({
+  servicePointId,
+  serviceIds,
+  name,
+  description,
+}: {
+  servicePointId?: string;
+  serviceIds: string[];
+  name: string;
+  description: string;
+}) {
   const pk = servicePointId ?? ulid();
 
   await ddbDocClient.send(
@@ -155,7 +192,10 @@ async function createServicePoint(event) {
                 S: description,
               },
               serviceIds: {
-                L: [],
+                L:
+                  serviceIds.map((x) => ({
+                    S: x,
+                  })) ?? [],
               },
             },
             ConditionExpression: "attribute_not_exists(PK)",
@@ -251,4 +291,22 @@ async function updateServicePoint({
   );
 
   return result.Attributes;
+}
+
+async function deleteServicePoint({
+  servicePointId,
+}: {
+  servicePointId: string;
+}) {
+  const result = await ddbDocClient.send(
+    new DeleteCommand({
+      TableName,
+      Key: {
+        PK: prefixServicePoint + servicePointId,
+        SK: prefixServicePoint + servicePointId,
+      },
+      ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+    })
+  );
+  return result;
 }
