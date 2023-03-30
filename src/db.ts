@@ -18,7 +18,6 @@ export const buildQueueSK = ({
 }) =>
   `${prefixQueueStatus}${status}Q_PRIORITY#${priority}#Q_DATE${dateISOString}`;
 
-export const prefixServicePoint = "SP#";
 if (!process.env.ONE_TABLE) {
   throw new Error("ONE_TABLE env variable is not set");
 }

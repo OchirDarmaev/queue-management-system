@@ -1,5 +1,4 @@
 import {
-  BatchGetCommand,
   GetCommand,
   TransactWriteCommand,
   UpdateCommand,
@@ -12,10 +11,10 @@ import {
   buildQueueSK,
   prefixQueue,
   prefixQueueStatus,
-  prefixServicePoint,
   TableName,
 } from "../db";
 import { ulid } from "ulid";
+import { getServiceFromServicePointsIds } from "../servicePoints/servicePoints";
 
 export enum QueueStatus {
   QUEUED = "0-queued",
@@ -35,7 +34,13 @@ export const createQueueItemHandler: APIGatewayProxyHandler = async (
   context
 ) => {
   try {
-    const { serviceId } = event.pathParameters;
+    const serviceId = event.pathParameters?.serviceId;
+    if (!serviceId) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
     const res = await createQueueItem({ serviceId });
     return {
       statusCode: 201,
@@ -55,7 +60,13 @@ export const getQueueItemHandler: APIGatewayProxyHandler = async (
   context
 ) => {
   try {
-    const { queueId } = event.pathParameters;
+    const queueId = event.pathParameters?.queueId;
+    if (!queueId) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
     const item = await getQueueItem({
       queueId,
     });
@@ -67,6 +78,7 @@ export const getQueueItemHandler: APIGatewayProxyHandler = async (
     console.error(error);
     return {
       statusCode: 500,
+      body: "Internal Server Error",
     };
   }
 };
@@ -76,7 +88,13 @@ export const getQueueItemsHandler: APIGatewayProxyHandler = async (
   context
 ) => {
   try {
-    const serviceId = event.pathParameters.serviceId;
+    const serviceId = event.pathParameters?.serviceId;
+    if (!serviceId) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
     const res = await getQueueItems({ serviceId });
     return {
       statusCode: 200,
@@ -96,7 +114,20 @@ export const updateQueueItemHandler: APIGatewayProxyHandler = async (
   context
 ) => {
   try {
-    const { queueId } = event.pathParameters;
+    const queueId = event.pathParameters?.queueId;
+    if (!queueId) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
+
+    if (!event.body) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
     const { status, priority } = JSON.parse(event.body);
     const res = await updateQueueItem({
       queueId,
@@ -230,7 +261,7 @@ async function getQueuePosition({
   gsi1sk: string;
 }): Promise<number> {
   if (!gsi1sk.startsWith(prefixQueueStatus + QueueStatus.QUEUED)) {
-    return 0;
+     throw new Error("Queue item is not queued");
   }
 
   const queuePositionResult = await ddbDocClient.send(
@@ -246,7 +277,10 @@ async function getQueuePosition({
       ScanIndexForward: true,
     })
   );
-  return queuePositionResult.Count;
+  if (!queuePositionResult) {
+    throw new Error("Queue position not found");
+  }
+  return (queuePositionResult.Count as number) + 1;
 }
 
 async function updateQueueItem({
@@ -261,7 +295,7 @@ async function updateQueueItem({
   dateISOString?: string;
 }) {
   const item = await getQueueItem({ queueId });
-  const newStatus = status ?? item.status;
+  const newStatus = status ?? (item.status as QueueStatus);
   const newPriority = priority ?? item.priority;
   const newDate = dateISOString ?? item.dateISOString;
 
@@ -294,49 +328,41 @@ async function updateQueueItem({
 }
 
 async function getQueuedInfo() {
-  const result = await ddbDocClient.send(
-    new QueryCommand({
-      TableName,
-      KeyConditionExpression: "PK = :pk",
-      ExpressionAttributeValues: {
-        ":pk": prefixServicePoint,
-      },
-    })
-  );
-  const keys = result.Items.map((item) => ({
-    PK: item.SK,
-    SK: item.SK,
-  }));
-  const servicePoints = await ddbDocClient.send(
-    new BatchGetCommand({
-      RequestItems: {
-        [TableName]: {
-          Keys: keys,
-        },
-      },
-    })
-  );
-  const ser = servicePoints.Responses[TableName];
+  const serviceIds = await getServiceFromServicePointsIds();
+  return await getItemsByStatus({
+    serviceIds,
+    queueStatuses: Object.values(QueueStatus),
+    limit: 10,
+  });
+}
 
-  const serviceIds = [...new Set(ser?.flatMap((item) => item.serviceIds))];
-
+export async function getItemsByStatus({
+  serviceIds,
+  queueStatuses,
+  limit,
+}: {
+  serviceIds: string[];
+  queueStatuses: QueueStatus[];
+  limit: number;
+}): Promise<Partial<Record<QueueStatus, unknown[]>>> {
   const itemsByStatus = await Promise.all(
-    Object.values(QueueStatus).map(async (status) => ({
+    queueStatuses.map(async (status) => ({
       status,
+      // to do take a look order issue
       items: await Promise.all(
         serviceIds.flatMap((serviceId) =>
-          getQueuedItems({ serviceId, limit: 10, status })
+          getQueuedItems({ serviceId, limit, status })
         )
       ),
     }))
   );
 
-  return {
-    itemsByStatus,
-  };
+  return Object.fromEntries(
+    itemsByStatus.map((item) => [item.status, item.items])
+  );
 }
 
-async function getQueuedItems({
+export async function getQueuedItems({
   serviceId,
   limit,
   status,

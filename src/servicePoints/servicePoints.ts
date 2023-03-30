@@ -5,34 +5,100 @@ import {
   DeleteCommand,
   GetCommand,
   QueryCommand,
+  TransactWriteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
-import { prefixService, prefixServicePoint, TableName } from "../db";
-import {
-  BatchGetItemCommand,
-  TransactWriteItemsCommand,
-  UpdateItemCommand,
-} from "@aws-sdk/client-dynamodb";
+import { prefixQueue, prefixService, TableName } from "../db";
+import { getItemsByStatus, getQueuedItems, QueueStatus } from "../queue/queue";
+import { Item } from "../baseItem";
 
 export enum ServicePointStatus {
-  ACTIVE = "active",
-  INACTIVE = "inactive",
+  WAITING = "waiting",
+  IN_SERVICE = "in-service",
+  CLOSED = "closed",
+}
+
+export type IServicePoint = {
+  id: string;
+  serviceIds: string[];
+  name: string;
+  description: string;
+  servicePointStatus: ServicePointStatus;
+  currentItem?: string;
+};
+
+export class ServicePointItem extends Item {
+  static prefixServicePoint = "SP#";
+  public id: string;
+  public serviceIds: string[];
+  public name: string;
+  public description: string;
+  public servicePointStatus: ServicePointStatus;
+  public currentItem?: string;
+  constructor(servicePoint: Partial<IServicePoint>) {
+    super();
+    this.id = servicePoint.id || ulid();
+    this.serviceIds = servicePoint.serviceIds || [];
+    this.name = servicePoint.name || "";
+    this.description = servicePoint.description || "";
+    this.servicePointStatus =
+      servicePoint.servicePointStatus || ServicePointStatus.CLOSED;
+    this.currentItem = servicePoint.currentItem;
+  }
+
+  get PK(): string {
+    return ServicePointItem.prefixServicePoint + this.id;
+  }
+
+  get SK(): string {
+    return ServicePointItem.prefixServicePoint + this.id;
+  }
+
+  static fromItem(item: any): ServicePointItem {
+    return new ServicePointItem({
+      id: item.id,
+      serviceIds: item.serviceIds,
+      name: item.name,
+      description: item.description,
+      servicePointStatus: item.servicePointStatus,
+      currentItem: item.currentItem,
+    });
+  }
+
+  toItem(): Record<string, unknown> {
+    return {
+      ...this.keys(),
+      id: this.id,
+      serviceIds: this.serviceIds,
+      name: this.name,
+      description: this.description,
+      servicePointStatus: this.servicePointStatus,
+      currentItem: this.currentItem,
+    };
+  }
 }
 
 export const createServicePointHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  if (!event.body) {
+    return {
+      statusCode: 400,
+      body: "Bad Request",
+    };
+  }
   try {
     const { servicePointId, serviceIds, name, description } = JSON.parse(
       event.body
     );
     const res = await createServicePoint({
-      servicePointId,
+      id: servicePointId,
       serviceIds,
       name,
       description,
+      servicePointStatus: ServicePointStatus.CLOSED,
     });
     return {
       statusCode: 201,
@@ -52,8 +118,14 @@ export const getServicePointHandler: APIGatewayProxyHandler = async (
   context
 ) => {
   try {
-    const { servicePointId } = event.pathParameters;
-    const res = await getServicePoint({ servicePointId });
+    const id = event.pathParameters?.servicePointId;
+    if (!id) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
+    const res = await getServicePoint({ id });
     return {
       statusCode: 200,
       body: JSON.stringify(res),
@@ -91,10 +163,22 @@ export const updateServicePointHandler: APIGatewayProxyHandler = async (
   context
 ) => {
   try {
-    const { servicePointId } = event.pathParameters;
+    const servicePointId = event.pathParameters?.servicePointId;
+    if (!servicePointId) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
+    if (!event.body) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
     const { serviceIds, name, description, status } = JSON.parse(event.body);
     const res = await updateServicePoint({
-      servicePointId,
+      id: servicePointId,
       serviceIds,
       name,
       description,
@@ -118,8 +202,14 @@ export const deleteServicePointHandler: APIGatewayProxyHandler = async (
   context
 ) => {
   try {
-    const { servicePointId } = event.pathParameters;
-    const res = await deleteServicePoint({ servicePointId });
+    const id = event.pathParameters?.servicePointId;
+    if (!id) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
+    const res = await deleteServicePoint({ id });
     return {
       statusCode: 200,
       body: JSON.stringify(res),
@@ -139,10 +229,391 @@ async function getServicePoints() {
       TableName,
       KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: {
-        ":pk": prefixServicePoint,
+        ":pk": ServicePointItem.prefixServicePoint,
       },
     })
   );
+
+  if (!result?.Items?.length) {
+    return [];
+  }
+
+  const keys = result?.Items?.map((item) => ({
+    PK: item.SK,
+    SK: item.SK,
+  }));
+  const servicePoints = await ddbDocClient.send(
+    new BatchGetCommand({
+      RequestItems: {
+        [TableName]: {
+          Keys: keys,
+        },
+      },
+    })
+  );
+  const res = servicePoints.Responses?.[TableName];
+
+  if (!res) {
+    throw new Error("No service points found");
+  }
+
+  return res.map((item) => ServicePointItem.fromItem(item));
+}
+
+async function createServicePoint(
+  servicePoint: IServicePoint
+): Promise<IServicePoint> {
+  const servicePointItem = new ServicePointItem(servicePoint);
+
+  await ddbDocClient.send(
+    new TransactWriteCommand({
+      TransactItems: [
+        {
+          Put: {
+            TableName,
+            Item: servicePointItem.toItem(),
+            ConditionExpression: "attribute_not_exists(PK)",
+          },
+        },
+        {
+          Put: {
+            TableName,
+            Item: {
+              PK: ServicePointItem.prefixServicePoint,
+              SK: servicePointItem.PK,
+            },
+          },
+        },
+      ],
+    })
+  );
+
+  return servicePointItem;
+}
+
+async function getServicePoint(
+  servicePoint: Pick<IServicePoint, "id">
+): Promise<IServicePoint> {
+  const s = new ServicePointItem(servicePoint).keys();
+  const result = await ddbDocClient.send(
+    new GetCommand({
+      TableName,
+      Key: s,
+    })
+  );
+  if (!result.Item) {
+    throw new Error("Service point not found");
+  }
+
+  return new ServicePointItem(result.Item);
+}
+
+async function updateServicePoint(
+  servicePoint: IServicePoint
+): Promise<IServicePoint> {
+  if (servicePoint.serviceIds?.length) {
+    const result1 = await ddbDocClient.send(
+      new BatchGetCommand({
+        RequestItems: {
+          [TableName]: {
+            Keys: servicePoint.serviceIds.map((id) => ({
+              PK: prefixService + id,
+              SK: prefixService + id,
+            })),
+          },
+        },
+      })
+    );
+
+    if (
+      result1?.Responses?.[TableName]?.length !== servicePoint.serviceIds.length
+    ) {
+      throw new Error("Service not found");
+    }
+  }
+
+  const result = await ddbDocClient.send(
+    new UpdateCommand({
+      TableName,
+      Key: new ServicePointItem(servicePoint).keys(),
+      UpdateExpression:
+        "SET serviceIds = :serviceIds, servicePointName = :name, description = :description, servicePointStatus = :servicePointStatus",
+      ExpressionAttributeValues: {
+        ":serviceIds": servicePoint.serviceIds,
+        ":name": servicePoint.name,
+        ":description": servicePoint.description,
+        ":servicePointStatus": servicePoint.servicePointStatus,
+      },
+      ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  if (!result.Attributes) {
+    throw new Error("Service point not found");
+  }
+
+  return new ServicePointItem(result.Attributes);
+}
+
+async function deleteServicePoint(servicePoint: Pick<IServicePoint, "id">) {
+  const result = await ddbDocClient.send(
+    new DeleteCommand({
+      TableName,
+      Key: new ServicePointItem(servicePoint).keys(),
+      ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+    })
+  );
+  return result;
+}
+
+async function updateServicePointStatus({
+  id,
+  servicePointStatus: newServicePointStatus,
+}: Pick<IServicePoint, "id" | "servicePointStatus">) {
+  const result = await ddbDocClient.send(
+    new GetCommand({
+      TableName,
+      Key: new ServicePointItem({ id }).keys(),
+    })
+  );
+  if (!result.Item) {
+    throw new Error("Service point not found");
+  }
+  const servicePoint = new ServicePointItem(result.Item);
+
+  if (servicePoint.servicePointStatus === newServicePointStatus) {
+    // no change
+    return;
+  }
+
+  switch (servicePoint.servicePointStatus) {
+    case ServicePointStatus.CLOSED:
+      switch (newServicePointStatus) {
+        case ServicePointStatus.IN_SERVICE:
+          throw new Error("Service point is closed");
+        case ServicePointStatus.WAITING:
+          await startWaitingQueue(servicePoint);
+          return;
+        default:
+          throw new Error("Invalid status");
+      }
+    case ServicePointStatus.WAITING:
+      if (!servicePoint.serviceIds || servicePoint.serviceIds.length === 0) {
+        throw new Error("Service point has no service");
+      }
+
+      switch (newServicePointStatus) {
+        case ServicePointStatus.CLOSED:
+          await putItemBackToQueue(servicePoint);
+          await closeServicePoint(servicePoint);
+          return;
+        case ServicePointStatus.IN_SERVICE:
+          await startServicingItemQueue(servicePoint);
+          return;
+        default:
+          throw new Error("Invalid status");
+      }
+    case ServicePointStatus.IN_SERVICE:
+      switch (newServicePointStatus) {
+        case ServicePointStatus.CLOSED:
+          await markAsServed(servicePoint);
+          await closeServicePoint(servicePoint);
+          return;
+
+        case ServicePointStatus.WAITING:
+          await markAsServed(servicePoint);
+          await startWaitingQueue(servicePoint);
+          return;
+        default:
+          throw new Error("Invalid status");
+      }
+      break;
+  }
+}
+
+async function startWaitingQueue(servicePoint: ServicePointItem) {
+  // if current item is empty
+  if (!servicePoint.currentItem) {
+    // get queue item from queue and mark queue item as PENDING
+    servicePoint.serviceIds;
+    const itemsByStatus = getItemsByStatus({
+      serviceIds: servicePoint.serviceIds,
+      queueStatuses: [QueueStatus.QUEUED],
+      limit: 1,
+    });
+    const item = itemsByStatus[QueueStatus.QUEUED][0];
+    if (!item) {
+      throw new Error("No item in queue");
+    }
+
+    // transaction
+    // mark queue item as PENDING
+    // put queue item to current item
+    await ddbDocClient.send(
+      new TransactWriteCommand({
+        TransactItems: [
+          {
+            Update: {
+              TableName: TableName,
+              Key: {
+                PK: prefixQueue + item.queueId,
+                SK: prefixQueue + item.queueId,
+              },
+              UpdateExpression: "SET queueStatus = :queueStatus",
+              ExpressionAttributeValues: {
+                ":queueStatus": QueueStatus.PENDING,
+              },
+              ConditionExpression:
+                "attribute_exists(PK) and attribute_exists(SK) and queueStatus <> :queueStatus",
+            },
+          },
+          {
+            Update: {
+              TableName: TableName,
+              Key: servicePoint.keys(),
+              UpdateExpression:
+                "SET currentItem = :currentItem, servicePointStatus = :servicePointStatus",
+              ExpressionAttributeValues: {
+                ":currentItem": item.queueId,
+                ":servicePointStatus": ServicePointStatus.WAITING,
+              },
+              ConditionExpression:
+                "attribute_exists(PK) and attribute_exists(SK) and attribute_not_exists(currentItem)",
+            },
+          },
+        ],
+      })
+    );
+  }
+}
+
+async function putItemBackToQueue(servicePoint: ServicePointItem) {
+  // transaction
+  // mark queue item as QUEUED
+  // clear current item
+  // change status to CLOSED
+  await ddbDocClient.send(
+    new TransactWriteCommand({
+      TransactItems: [
+        {
+          Update: {
+            TableName: TableName,
+            Key: {
+              PK: prefixQueue + servicePoint.currentItem,
+              SK: prefixQueue + servicePoint.currentItem,
+            },
+            UpdateExpression: "SET queueStatus = :queueStatus",
+            ExpressionAttributeValues: {
+              ":queueStatus": QueueStatus.QUEUED,
+            },
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK)",
+          },
+        },
+        {
+          Update: {
+            TableName: TableName,
+            Key: servicePoint.keys(),
+            UpdateExpression: "SET currentItem = :currentItem",
+            ExpressionAttributeValues: {
+              ":currentItem": "",
+            },
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK)",
+          },
+        },
+      ],
+    })
+  );
+}
+
+async function startServicingItemQueue(servicePoint: ServicePointItem) {
+  // if current item is empty throw error
+  // change status to IN_SERVICE
+  await ddbDocClient.send(
+    new UpdateCommand({
+      TableName,
+      Key: servicePoint.keys(),
+      UpdateExpression: "SET servicePointStatus = :servicePointStatus",
+      ExpressionAttributeValues: {
+        ":servicePointStatus": ServicePointStatus.IN_SERVICE,
+      },
+      ConditionExpression:
+        "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentItem)",
+    })
+  );
+}
+
+async function markAsServed(servicePoint: ServicePointItem) {
+  // transaction
+  // mark queue item as SERVED
+  // clear current item
+  await ddbDocClient.send(
+    new TransactWriteCommand({
+      TransactItems: [
+        {
+          Update: {
+            TableName: TableName,
+            Key: {
+              PK: prefixQueue + servicePoint.currentItem,
+              SK: prefixQueue + servicePoint.currentItem,
+            },
+            UpdateExpression: "SET queueStatus = :queueStatus",
+            ExpressionAttributeValues: {
+              ":queueStatus": QueueStatus.SERVED,
+            },
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK) and queueStatus <> :queueStatus",
+          },
+        },
+        {
+          Update: {
+            TableName: TableName,
+            Key: servicePoint.keys(),
+            UpdateExpression: "SET currentItem = :currentItem",
+            ExpressionAttributeValues: {
+              ":currentItem": "",
+            },
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentItem)",
+          },
+        },
+      ],
+    })
+  );
+}
+
+async function closeServicePoint(servicePoint: ServicePointItem) {
+  await ddbDocClient.send(
+    new UpdateCommand({
+      TableName,
+      Key: servicePoint.keys(),
+      UpdateExpression: "SET servicePointStatus = :servicePointStatus",
+      ExpressionAttributeValues: {
+        ":servicePointStatus": ServicePointStatus.CLOSED,
+      },
+      ConditionExpression:
+        "attribute_exists(PK) and attribute_exists(SK) and servicePointStatus <> :servicePointStatus",
+    })
+  );
+}
+
+export async function getServiceFromServicePointsIds(): Promise<string[]> {
+  const result = await ddbDocClient.send(
+    new QueryCommand({
+      TableName,
+      KeyConditionExpression: "PK = :pk",
+      ExpressionAttributeValues: {
+        ":pk": ServicePointItem.prefixServicePoint,
+      },
+    })
+  );
+
+  if (!result.Items?.length) {
+    return [];
+  }
+
   const keys = result.Items.map((item) => ({
     PK: item.SK,
     SK: item.SK,
@@ -156,160 +627,9 @@ async function getServicePoints() {
       },
     })
   );
-  return servicePoints.Responses[TableName];
-}
-
-async function createServicePoint({
-  servicePointId,
-  serviceIds,
-  name,
-  description,
-}: {
-  servicePointId?: string;
-  serviceIds: string[];
-  name: string;
-  description: string;
-}) {
-  const pk = servicePointId ?? ulid();
-
-  await ddbDocClient.send(
-    new TransactWriteItemsCommand({
-      TransactItems: [
-        {
-          Put: {
-            TableName,
-            Item: {
-              PK: {
-                S: prefixServicePoint + pk,
-              },
-              SK: {
-                S: prefixServicePoint + pk,
-              },
-              servicePointName: {
-                S: name,
-              },
-              description: {
-                S: description,
-              },
-              servicePointStatus: {
-                S: ServicePointStatus.INACTIVE,
-              },
-              serviceIds: {
-                L:
-                  serviceIds.map((x) => ({
-                    S: x,
-                  })) ?? [],
-              },
-            },
-            ConditionExpression: "attribute_not_exists(PK)",
-          },
-        },
-        {
-          Put: {
-            TableName,
-            Item: {
-              PK: {
-                S: prefixServicePoint,
-              },
-              SK: {
-                S: prefixServicePoint + pk,
-              },
-            },
-          },
-        },
-      ],
-    })
+  const serviceIds = servicePoints.Responses?.[TableName]?.flatMap(
+    (item) => item.serviceIds
   );
 
-  return {
-    id: pk,
-    name,
-    description,
-  };
-}
-
-async function getServicePoint({ servicePointId }: { servicePointId: string }) {
-  const result = await ddbDocClient.send(
-    new GetCommand({
-      TableName,
-      Key: {
-        PK: prefixServicePoint + servicePointId,
-        SK: prefixServicePoint + servicePointId,
-      },
-    })
-  );
-  return result.Item;
-}
-
-async function updateServicePoint({
-  servicePointId,
-  serviceIds,
-  name,
-  description,
-  servicePointStatus: servicePointStatus,
-}: {
-  servicePointId: string;
-  name: string;
-  description: string;
-  servicePointStatus: ServicePointStatus;
-  serviceIds: string[];
-}) {
-  if (serviceIds.length) {
-    const result1 = await ddbDocClient.send(
-      new BatchGetCommand({
-        RequestItems: {
-          [TableName]: {
-            Keys: serviceIds.map((id) => ({
-              PK: prefixService + id,
-              SK: prefixService + id,
-            })),
-          },
-        },
-      })
-    );
-
-    if (result1.Responses[TableName].length !== serviceIds.length) {
-      throw new Error("Service not found");
-    }
-  }
-
-  const result = await ddbDocClient.send(
-    new UpdateCommand({
-      TableName,
-      Key: {
-        PK: prefixServicePoint + servicePointId,
-        SK: prefixServicePoint + servicePointId,
-      },
-      UpdateExpression:
-        "SET serviceIds = :serviceIds, servicePointName = :name, description = :description, servicePointStatus = :servicePointStatus",
-      ExpressionAttributeValues: {
-        ":serviceIds": serviceIds,
-        ":name": name,
-        ":description": description,
-        ":servicePointStatus": servicePointStatus,
-      },
-      ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
-      ReturnValues: "ALL_NEW",
-    })
-  );
-
-  return result.Attributes;
-}
-
-async function deleteServicePoint({
-  servicePointId,
-}: {
-  servicePointId: string;
-}) {
-  const result = await ddbDocClient.send(
-    new DeleteCommand({
-      TableName,
-      Key: {
-        PK: prefixServicePoint + servicePointId,
-        SK: prefixServicePoint + servicePointId,
-      },
-      ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
-    })
-  );
-  return result;
+  return [...new Set(serviceIds)];
 }
