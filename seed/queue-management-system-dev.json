@@ -1,0 +1,88 @@
+[
+  {
+    "SK": "SP#01GWSQ05MNSR4EH74XDS2F27XA",
+    "PK": "SP#"
+  },
+  {
+    "SK": "SP#01GWSQ0K73G3HFKAVZ541VNBAQ",
+    "PK": "SP#"
+  },
+  {
+    "GSI1PK": "SQ#01GWSPYTSVDW5QHJ8XEYBHND9V",
+    "GSI1SK": "Q_STATUS#0-queuedQ_PRIORITY#1-medium#Q_DATE2023-03-30T16:52:45.173Z",
+    "SK": "Q#01GWSPZ6ZMPXA8X5447WACMQ67",
+    "PK": "Q#01GWSPZ6ZMPXA8X5447WACMQ67",
+    "priority": "1-medium",
+    "dateISOString": "2023-03-30T16:52:45.173Z",
+    "status": "0-queued"
+  },
+  {
+    "GSI1PK": "SQ#01GWSPYTSVDW5QHJ8XEYBHND9V",
+    "GSI1SK": "Q_STATUS#0-queuedQ_PRIORITY#1-medium#Q_DATE2023-03-30T16:52:44.455Z",
+    "SK": "Q#01GWSPZ697MYFGPAQXY4J2F1E7",
+    "PK": "Q#01GWSPZ697MYFGPAQXY4J2F1E7",
+    "priority": "1-medium",
+    "dateISOString": "2023-03-30T16:52:44.455Z",
+    "status": "0-queued"
+  },
+  {
+    "SK": "S#01GWSPYTSVDW5QHJ8XEYBHND9V",
+    "name": "Service name 2",
+    "description": "Service description 2",
+    "PK": "S#01GWSPYTSVDW5QHJ8XEYBHND9V"
+  },
+  {
+    "serviceIds": [
+      "01GWSPYTSVDW5QHJ8XEYBHND9V"
+    ],
+    "SK": "SP#01GWSQ0K73G3HFKAVZ541VNBAQ",
+    "name": "Service point",
+    "description": "Service point description",
+    "PK": "SP#01GWSQ0K73G3HFKAVZ541VNBAQ",
+    "id": "01GWSQ0K73G3HFKAVZ541VNBAQ",
+    "servicePointStatus": "closed"
+  },
+  {
+    "SK": "S#01GWSPYPTT87RTZFTTD20RC63V",
+    "name": "Service name",
+    "description": "Service description",
+    "PK": "S#01GWSPYPTT87RTZFTTD20RC63V"
+  },
+  {
+    "GSI1PK": "SQ#01GWSPYTSVDW5QHJ8XEYBHND9V",
+    "GSI1SK": "Q_STATUS#0-queuedQ_PRIORITY#1-medium#Q_DATE2023-03-30T16:52:43.781Z",
+    "SK": "Q#01GWSPZ5M430HRSHCXYM964VQA",
+    "PK": "Q#01GWSPZ5M430HRSHCXYM964VQA",
+    "priority": "1-medium",
+    "dateISOString": "2023-03-30T16:52:43.781Z",
+    "status": "0-queued"
+  },
+  {
+    "serviceIds": [
+      "01GWSPYTSVDW5QHJ8XEYBHND9V"
+    ],
+    "SK": "SP#01GWSQ05MNSR4EH74XDS2F27XA",
+    "name": "Service point",
+    "description": "Service point description",
+    "PK": "SP#01GWSQ05MNSR4EH74XDS2F27XA",
+    "id": "01GWSQ05MNSR4EH74XDS2F27XA",
+    "servicePointStatus": "closed"
+  },
+  {
+    "SK": "S#01GWSPYPTT87RTZFTTD20RC63V",
+    "PK": "S#"
+  },
+  {
+    "SK": "S#01GWSPYTSVDW5QHJ8XEYBHND9V",
+    "PK": "S#"
+  },
+  {
+    "GSI1PK": "SQ#01GWSPYTSVDW5QHJ8XEYBHND9V",
+    "GSI1SK": "Q_STATUS#0-queuedQ_PRIORITY#1-medium#Q_DATE2023-03-30T16:52:45.776Z",
+    "SK": "Q#01GWSPZ7JFS72MJFEFAVYRA00Q",
+    "PK": "Q#01GWSPZ7JFS72MJFEFAVYRA00Q",
+    "priority": "1-medium",
+    "dateISOString": "2023-03-30T16:52:45.776Z",
+    "status": "0-queued"
+  }
+]

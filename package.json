@@ -1,14 +1,12 @@
 {
   "name": "queue-management-system",
   "version": "1.0.0",
-  "description": "<!-- title: 'AWS NodeJS Example' description: 'This template demonstrates how to deploy a NodeJS function running on AWS Lambda using the traditional Serverless Framework.' layout: Doc framework: v3 platform: AWS language: nodeJS priority: 1 authorLink: 'https://github.com/serverless' authorName: 'Serverless, inc.' authorAvatar: 'https://avatars1.githubusercontent.com/u/13742415?s=200&v=4' -->",
-  "main": "index.js",
+  "description": "The electronic queue system allows you to automate the management of client flows",
   "scripts": {
-    "debug": "export SLS_DEBUG=* && node --inspect node_modules/serverless/bin/serverless offline",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "debug": "export IS_LOCAL_DEPLOYMENT=true && export SLS_DEBUG=* && node --inspect node_modules/serverless/bin/serverless offline start --stage dev --verbose --noPrependStageInUrl -t",
   },
-  "author": "",
-  "license": "ISC",
+  "author": "Ochir Darmaev",
+  "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.298.0",
     "@aws-sdk/lib-dynamodb": "^3.298.0",
