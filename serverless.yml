@@ -49,6 +49,12 @@ functions:
       - http:
           method: PUT
           path: /servicePoints/{servicePointId}
+  updateServicePointStatus:
+    handler: src/servicePoints/servicePoints.updateServicePointStatusHandler
+    events:
+      - http:
+          method: PUT
+          path: /servicePoints/{servicePointId}/status/{status}
   removeServicePoint:
     handler: src/servicePoints/servicePoints.removeServicePointHandler
     events:

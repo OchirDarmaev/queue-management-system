@@ -17,16 +17,16 @@ import { ulid } from "ulid";
 import { getServiceFromServicePointsIds } from "../servicePoints/servicePoints";
 
 export enum QueueStatus {
-  QUEUED = "0-queued",
-  PENDING = "1-pending",
-  IN_SERVICE = "2-in-service",
-  SERVED = "1-served",
-  SKIPPED = "3-skipped",
+  QUEUED = "00-queued",
+  PENDING = "01-pending",
+  IN_SERVICE = "02-in-service",
+  SERVED = "03-served",
+  SKIPPED = "04-skipped",
 }
 
 export enum QueuePriority {
-  high = "0-high",
-  medium = "1-medium",
+  high = "00-high",
+  medium = "01-medium",
 }
 
 export const createQueueItemHandler: APIGatewayProxyHandler = async (
@@ -167,7 +167,7 @@ export const getQueueStatusHandler: APIGatewayProxyHandler = async (
   }
 };
 
-async function getQueueItem({ queueId }: { queueId: string }) {
+export async function getQueueItem({ queueId }: { queueId: string }) {
   const result = await ddbDocClient.send(
     new GetCommand({
       TableName,
@@ -218,12 +218,12 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
 }> {
   const id = ulid();
   const pk = buildQueueKey(serviceId);
-  const item = {
+  const item = {};
+  const sk = buildQueueSK({
     status: QueueStatus.QUEUED,
     priority: QueuePriority.medium,
     dateISOString: new Date().toISOString(),
-  };
-  const sk = buildQueueSK(item);
+  });
   await ddbDocClient.send(
     new TransactWriteCommand({
       TransactItems: [
@@ -235,7 +235,9 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
               SK: prefixQueue + id,
               GSI1PK: pk,
               GSI1SK: sk,
-              ...item,
+              queueStatus: QueueStatus.QUEUED,
+              queuePriority: QueuePriority.medium,
+              queueDate: new Date().toISOString(),
             },
             ConditionExpression:
               "attribute_not_exists(PK) AND attribute_not_exists(SK)",
@@ -261,7 +263,7 @@ async function getQueuePosition({
   gsi1sk: string;
 }): Promise<number> {
   if (!gsi1sk.startsWith(prefixQueueStatus + QueueStatus.QUEUED)) {
-     throw new Error("Queue item is not queued");
+    throw new Error("Queue item is not queued");
   }
 
   const queuePositionResult = await ddbDocClient.send(
@@ -295,10 +297,13 @@ async function updateQueueItem({
   dateISOString?: string;
 }) {
   const item = await getQueueItem({ queueId });
-  const newStatus = status ?? (item.status as QueueStatus);
   const newPriority = priority ?? item.priority;
   const newDate = dateISOString ?? item.dateISOString;
-
+const gsi1sk =buildQueueSK({
+  status: item.status ,
+  priority: newPriority,
+  dateISOString: newDate,
+})
   await ddbDocClient.send(
     new UpdateCommand({
       TableName,
@@ -307,19 +312,14 @@ async function updateQueueItem({
         SK: prefixQueue + queueId,
       },
       UpdateExpression:
-        "SET GSI1SK = :gsi1sk, #status = :status, #priority = :priority, #dateISOString = :dateISOString",
+        "SET GSI1SK = :gsi1sk,  #priority = :priority, #dateISOString = :dateISOString",
       ExpressionAttributeNames: {
-        "#status": "status",
+        "#queueStatus": "queueStatus",
         "#priority": "priority",
         "#dateISOString": "dateISOString",
       },
       ExpressionAttributeValues: {
-        ":gsi1sk": buildQueueSK({
-          status: newStatus,
-          priority: newPriority,
-          dateISOString: newDate,
-        }),
-        ":status": newStatus,
+        ":gsi1sk": ,
         ":priority": newPriority,
         ":dateISOString": newDate,
       },
@@ -349,11 +349,13 @@ export async function getItemsByStatus({
     queueStatuses.map(async (status) => ({
       status,
       // to do take a look order issue
-      items: await Promise.all(
-        serviceIds.flatMap((serviceId) =>
-          getQueuedItems({ serviceId, limit, status })
+      items: (
+        await Promise.all(
+          serviceIds.map((serviceId) =>
+            getQueuedItems({ serviceId, limit, status })
+          )
         )
-      ),
+      ).flat(),
     }))
   );
 
