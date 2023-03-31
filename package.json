@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "The electronic queue system allows you to automate the management of client flows",
   "scripts": {
-    "debug": "export IS_LOCAL_DEPLOYMENT=true && export SLS_DEBUG=* && node --inspect node_modules/serverless/bin/serverless offline start --stage dev --verbose --noPrependStageInUrl -t",
+    "debug": "export IS_LOCAL_DEPLOYMENT=true && export SLS_DEBUG=* && node --inspect node_modules/serverless/bin/serverless offline start --stage dev --verbose --noPrependStageInUrl -t "
   },
   "author": "Ochir Darmaev",
   "license": "MIT",

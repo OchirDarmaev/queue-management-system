@@ -4,17 +4,59 @@ import { ulid } from "ulid";
 
 import {
   BatchGetCommand,
-  DeleteCommand,
-  PutCommand,
-  ScanCommand,
   UpdateCommand,
+  TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { prefixService, TableName } from "../db";
+import {  TableName } from "../db";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
-import {
-  BatchGetItemCommand,
-  TransactWriteItemsCommand,
-} from "@aws-sdk/client-dynamodb";
+
+import { Item } from "../baseItem";
+
+
+export type IService = {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export class ServiceItem extends Item implements IService {
+ static prefixService = "S#";
+
+  id: string;
+  name: string;
+  description: string;
+
+  constructor(service: IService) {
+    super();
+    this.id = service.id;
+    this.name = service.name;
+    this.description = service.description;
+  }
+
+  get PK() {
+    return ServiceItem.prefixService + this.id;
+  }
+
+  get SK() {
+    return ServiceItem.prefixService + this.id;
+  }
+
+  toItem(): Record<string, unknown> {
+    return {
+      ...this.keys(),
+      name: this.name,
+      description: this.description,
+    };
+  }
+
+  static fromItem(item: Record<string, unknown>): ServiceItem {
+    return new ServiceItem({
+      id: (item.PK as string).replace(ServiceItem.prefixService, ""),
+      name: item.name as string,
+      description: item.description as string,
+    });
+  }
+}
 
 export const handler: APIGatewayProxyHandler = async (event, context) => {
   try {
@@ -27,7 +69,14 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
         };
       }
       case "POST": {
-        const res = await createService(event);
+        if (!event.body) {
+          return {
+            statusCode: 400,
+            body: "Bad Request",
+          };
+        }
+        const { name, description } = JSON.parse(event.body);
+        const res = await createService({ name, description });
 
         return {
           statusCode: 201,
@@ -35,9 +84,39 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
         };
       }
       case "PUT":
-        return await updateService(event);
+       { const id = event.pathParameters?.serviceId;
+        if (!id) {
+          return {
+            statusCode: 400,
+            body: "Bad Request",
+          };
+        }
+        if (!event.body) {
+          return {
+            statusCode: 400,
+            body: "Bad Request",
+          };
+        }
+
+        const { name, description } = JSON.parse(event.body);
+        const service = await updateService({ id, name, description });
+        return {
+          statusCode: 200,
+          body: JSON.stringify(service),
+          };}
       case "DELETE":
-        return await deleteService(event);
+        {const id = event.pathParameters?.serviceId;
+          if (!id) {
+            return {
+              statusCode: 400,
+              body: "Bad Request",
+            };
+          }
+         await deleteService(id);
+        return {
+          statusCode: 200,
+          body: JSON.stringify({}),
+        };}
       default:
         return {
           statusCode: 405,
@@ -53,17 +132,17 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
   }
 };
 
-async function getServices() {
+async function getServices(): Promise<IService[]> {
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
       KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: {
-        ":pk": prefixService,
+        ":pk": ServiceItem.prefixService,
       },
     })
   );
-  const keys = result.Items.map((item) => ({
+  const keys = result.Items?.map((item) => ({
     PK: item.SK,
     SK: item.SK,
   }));
@@ -76,44 +155,27 @@ async function getServices() {
       },
     })
   );
-  return services.Responses[TableName];
+  return (services.Responses?.[TableName] || []).map((item) =>ServiceItem.fromItem(item));
 }
 
-async function createService(event) {
-  const { name, description } = JSON.parse(event.body);
+async function createService({ name, description }: Omit<IService, "id">): Promise<IService> {
   const id = ulid();
+  const serviceItem = new ServiceItem({ id, name, description });
   await ddbDocClient.send(
-    new TransactWriteItemsCommand({
+    new TransactWriteCommand({
       TransactItems: [
         {
           Put: {
             TableName,
-            Item: {
-              PK: {
-                S: prefixService + id,
-              },
-              SK: {
-                S: prefixService + id,
-              },
-              name: {
-                S: name,
-              },
-              description: {
-                S: description,
-              },
-            },
+            Item: serviceItem.toItem(),
           },
         },
         {
           Put: {
             TableName,
             Item: {
-              PK: {
-                S: prefixService,
-              },
-              SK: {
-                S: prefixService + id,
-              },
+              PK: ServiceItem.prefixService,
+              SK:serviceItem.PK 
             },
           },
         },
@@ -128,34 +190,46 @@ async function createService(event) {
   };
 }
 
-async function updateService(event) {
-  const serviceId = event.pathParameters.serviceId;
-  const { name, description } = JSON.parse(event.body);
-  const params = {
+async function updateService(service: IService): Promise<IService> {
+  
+  const serviceItem = new ServiceItem(service);
+  await ddbDocClient.send(new UpdateCommand({
     TableName,
-    Key: { PK: prefixService + serviceId, SK: prefixService + serviceId },
+    Key: serviceItem.keys() ,
 
     UpdateExpression: "set #n = :n, #d = :d",
     ExpressionAttributeNames: { "#n": "name", "#d": "description" },
-    ExpressionAttributeValues: { ":n": name, ":d": description },
-    ConditionExpression: "attribute_exists(PK)",
+    ExpressionAttributeValues: { ":n": service.name, ":d": service.description },
+    ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
     ReturnValues: "ALL_NEW",
-  };
-  const result = await ddbDocClient.send(new UpdateCommand(params));
-  return {
-    statusCode: 200,
-    body: JSON.stringify(result.Attributes),
-  };
+  }));
+
+  return service;
 }
 
-async function deleteService(event) {
-  const { serviceId: serviceId } = JSON.parse(event.body);
-  const params = {
-    TableName,
-    Key: { PK: prefixService + serviceId, SK: prefixService + serviceId },
-    ConditionExpression: "attribute_exists(service_id)",
-  };
-  await ddbDocClient.send(new DeleteCommand(params));
+async function deleteService(id: string)  {
+  
+  await ddbDocClient.send(new TransactWriteCommand({
+    TransactItems: [
+      {
+        Delete: {
+          TableName,
+          Key: { PK: ServiceItem. prefixService + id, SK: ServiceItem. prefixService + id },
+          ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+        }
+      ,
+      },
+      {
+        Delete: {
+          TableName,
+          Key: { PK: ServiceItem. prefixService, SK: ServiceItem. prefixService + id },
+          ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+        }
+      ,
+      },
+    ],
+  }));
+
   return {
     statusCode: 204,
     body: "",
