@@ -80,7 +80,6 @@ export class ServicePointItem extends Item {
   toItem(): Record<string, unknown> {
     return {
       ...this.keys(),
-      id: this.id,
       serviceIds: this.serviceIds,
       name: this.name,
       description: this.description,
@@ -405,10 +404,9 @@ async function updateServicePointStatus({
   if (!result.Item) {
     throw new Error("Service point not found");
   }
-  const servicePoint = new ServicePointItem(result.Item);
+  const servicePoint = ServicePointItem.fromItem(result.Item);
 
   if (servicePoint.servicePointStatus === newServicePointStatus) {
-    // no change
     return;
   }
 
@@ -458,9 +456,7 @@ async function updateServicePointStatus({
 }
 
 async function startWaitingQueue(servicePoint: ServicePointItem) {
-  // if current item is empty
   if (!servicePoint.currentQueueItem) {
-    // get queue item from queue and mark queue item as PENDING
     const itemsByStatus = await getItemsByStatus({
       serviceIds: servicePoint.serviceIds,
       queueStatuses: [QueueStatus.QUEUED],
@@ -471,10 +467,7 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
       throw new Error("No item in queue");
     }
 
-    // transaction
-    // mark queue item as PENDING
-    // put queue item to current item
-    queueItem.status = QueueStatus.PENDING;
+    queueItem.queueStatus = QueueStatus.PENDING;
 
     await ddbDocClient.send(
       new TransactWriteCommand({
@@ -483,16 +476,16 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
             Update: {
               TableName: TableName,
               Key: queueItem.keys(),
-              UpdateExpression: "SET #status = :queueStatus, GSI1SK = :gsi1sk",
+              UpdateExpression:
+                "SET #queueStatus = :queueStatus, GSI1SK = :gsi1sk",
               ExpressionAttributeNames: {
-                "#status": "status",
+                "#queueStatus": "queueStatus",
               },
               ExpressionAttributeValues: {
-                ":queueStatus": queueItem.status,
+                ":queueStatus": queueItem.queueStatus,
                 ":gsi1sk": queueItem.GSI1SK,
               },
               ConditionExpression:
-                // "attribute_exists(PK) and attribute_exists(SK) and #status <> :queueStatus",
                 "attribute_exists(PK) and attribute_exists(SK)",
             },
           },
@@ -507,7 +500,6 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
                 ":servicePointStatus": ServicePointStatus.WAITING,
               },
               ConditionExpression:
-                // "attribute_exists(PK) and attribute_exists(SK) and attribute_not_exists(currentItem)",
                 "attribute_exists(PK) and attribute_exists(SK)",
             },
           },
@@ -518,10 +510,6 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
 }
 
 async function putItemBackToQueue(servicePoint: ServicePointItem) {
-  // transaction
-  // mark queue item as QUEUED
-  // clear current item
-  // change status to CLOSED
   const res = await ddbDocClient.send(
     new GetCommand({
       TableName,
@@ -533,7 +521,7 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
     throw new Error("Queue item not found");
   }
   const queueItem = QueueItem.fromItem(res.Item);
-  queueItem.status = QueueStatus.QUEUED;
+  queueItem.queueStatus = QueueStatus.QUEUED;
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -545,7 +533,7 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
             UpdateExpression:
               "SET queueStatus = :queueStatus, GSI1SK = :gsi1sk",
             ExpressionAttributeValues: {
-              ":queueStatus": queueItem.status,
+              ":queueStatus": queueItem.queueStatus,
               ":gsi1sk": queueItem.GSI1SK,
             },
             ConditionExpression:
@@ -570,8 +558,6 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
 }
 
 async function startServicingItemQueue(servicePoint: ServicePointItem) {
-  // if current item is empty throw error
-  // change status to IN_SERVICE
   const res = await ddbDocClient.send(
     new GetCommand({
       TableName,
@@ -583,9 +569,8 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
     throw new Error("Queue item not found");
   }
   const queueItem = QueueItem.fromItem(res.Item);
-  queueItem.status = QueueStatus.IN_SERVICE;
+  queueItem.queueStatus = QueueStatus.IN_SERVICE;
 
-  // transaction
   await ddbDocClient.send(
     new TransactWriteCommand({
       TransactItems: [
@@ -596,7 +581,7 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
             UpdateExpression:
               "SET queueStatus = :queueStatus, GSI1SK = :gsi1sk",
             ExpressionAttributeValues: {
-              ":queueStatus": queueItem.status,
+              ":queueStatus": queueItem.queueStatus,
               ":gsi1sk": queueItem.GSI1SK,
             },
           },
@@ -619,28 +604,18 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
 }
 
 async function markAsServed(servicePoint: ServicePointItem) {
-  // transaction
-  // mark queue item as SERVED
-  // clear current item
-
   const res = await ddbDocClient.send(
     new GetCommand({
       TableName,
       Key: servicePoint.currentQueueItem,
     })
   );
-  // const status = QueueStatus.SERVED;
-  // const gsi1sk = buildQueueSK({
-  //   dateISOString: res.Item.dateISOString,
-  //   priority: res.Item.currentItemPriority,
-  //   status,
-  // });
 
   if (!res.Item) {
     throw new Error("Queue item not found");
   }
   const queueItem = QueueItem.fromItem(res.Item);
-  queueItem.status = QueueStatus.SERVED;
+  queueItem.queueStatus = QueueStatus.SERVED;
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -652,7 +627,7 @@ async function markAsServed(servicePoint: ServicePointItem) {
             UpdateExpression:
               "SET queueStatus = :queueStatus, GSI1SK = :gsi1sk",
             ExpressionAttributeValues: {
-              ":queueStatus": queueItem.status,
+              ":queueStatus": queueItem.queueStatus,
               ":gsi1sk": queueItem.GSI1SK,
             },
             ConditionExpression:
