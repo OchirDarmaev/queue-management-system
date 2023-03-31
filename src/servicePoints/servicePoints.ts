@@ -4,12 +4,13 @@ import {
   BatchGetCommand,
   DeleteCommand,
   GetCommand,
+  PutCommand,
   QueryCommand,
   TransactWriteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
-import {  TableName } from "../db";
+import { TableName } from "../db";
 import { getItemsByStatus, QueueItem, QueueStatus } from "../queue/queue";
 import { Item } from "../baseItem";
 import { ServiceItem } from "../services/services";
@@ -29,7 +30,7 @@ export type IServicePoint = {
   currentItem?: string;
 };
 
-export class ServicePointItem extends Item  {
+export class ServicePointItem extends Item {
   static prefixServicePoint = "SP#";
   public id: string;
   public serviceIds: string[];
@@ -49,7 +50,7 @@ export class ServicePointItem extends Item  {
   }
 
   get PK(): string {
-    return ServicePointItem.prefixServicePoint + this.id;
+    return ServicePointItem.prefixServicePoint;
   }
 
   get SK(): string {
@@ -57,7 +58,14 @@ export class ServicePointItem extends Item  {
   }
 
   static fromItem(item: Record<string, unknown>): ServicePointItem {
-    return new ServicePointItem(item);
+    return new ServicePointItem({
+      id: (item.SK as string).replace(ServicePointItem.prefixServicePoint, ""),
+      serviceIds: item.serviceIds as string[],
+      name: item.name as string,
+      description: item.description as string,
+      servicePointStatus: item.servicePointStatus as ServicePointStatus,
+      currentItem: item.currentItem as string,
+    });
   }
 
   toItem(): Record<string, unknown> {
@@ -69,6 +77,16 @@ export class ServicePointItem extends Item  {
       description: this.description,
       servicePointStatus: this.servicePointStatus,
       currentItem: this.currentQueueItem,
+    };
+  }
+
+  static buildKey(queueId: string): {
+    PK: string;
+    SK: string;
+  } {
+    return {
+      PK: ServicePointItem.prefixServicePoint,
+      SK: ServicePointItem.prefixServicePoint + queueId,
     };
   }
 }
@@ -257,37 +275,15 @@ async function getServicePoints() {
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-      KeyConditionExpression: "PK = :pk",
+      KeyConditionExpression: "PK = :pk and begins_with(SK, :sk)",
       ExpressionAttributeValues: {
         ":pk": ServicePointItem.prefixServicePoint,
+        ":sk": ServicePointItem.prefixServicePoint,
       },
     })
   );
 
-  if (!result?.Items?.length) {
-    return [];
-  }
-
-  const keys = result?.Items?.map((item) => ({
-    PK: item.SK,
-    SK: item.SK,
-  }));
-  const servicePoints = await ddbDocClient.send(
-    new BatchGetCommand({
-      RequestItems: {
-        [TableName]: {
-          Keys: keys,
-        },
-      },
-    })
-  );
-  const res = servicePoints.Responses?.[TableName];
-
-  if (!res) {
-    throw new Error("No service points found");
-  }
-
-  return res.map((item) => ServicePointItem.fromItem(item));
+  return result?.Items?.map((item) => ServicePointItem.fromItem(item)) || [];
 }
 
 async function createServicePoint(
@@ -296,25 +292,11 @@ async function createServicePoint(
   const servicePointItem = new ServicePointItem(servicePoint);
 
   await ddbDocClient.send(
-    new TransactWriteCommand({
-      TransactItems: [
-        {
-          Put: {
-            TableName,
-            Item: servicePointItem.toItem(),
-            ConditionExpression: "attribute_not_exists(PK)",
-          },
-        },
-        {
-          Put: {
-            TableName,
-            Item: {
-              PK: ServicePointItem.prefixServicePoint,
-              SK: servicePointItem.PK,
-            },
-          },
-        },
-      ],
+    new PutCommand({
+      TableName,
+      Item: servicePointItem.toItem(),
+      ConditionExpression:
+        "attribute_not_exists(PK) AND attribute_not_exists(SK)",
     })
   );
 
@@ -330,11 +312,10 @@ async function createServicePoint(
 async function getServicePoint(
   servicePoint: Pick<IServicePoint, "id">
 ): Promise<IServicePoint> {
-  const s = new ServicePointItem(servicePoint).keys();
   const result = await ddbDocClient.send(
     new GetCommand({
       TableName,
-      Key: s,
+      Key: new ServicePointItem(servicePoint).keys(),
     })
   );
   if (!result.Item) {
@@ -554,11 +535,11 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
         {
           Update: {
             TableName: TableName,
-              Key: queueItem.keys(),
+            Key: queueItem.keys(),
             UpdateExpression:
               "SET queueStatus = :queueStatus, GSI1SK = :gsi1sk",
             ExpressionAttributeValues: {
-              ":queueStatus": queueItem.status ,
+              ":queueStatus": queueItem.status,
               ":gsi1sk": queueItem.GSI1SK,
             },
             ConditionExpression:

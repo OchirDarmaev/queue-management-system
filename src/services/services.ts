@@ -6,21 +6,22 @@ import {
   BatchGetCommand,
   UpdateCommand,
   TransactWriteCommand,
+  PutCommand,
+  DeleteCommand,
 } from "@aws-sdk/lib-dynamodb";
-import {  TableName } from "../db";
+import { TableName } from "../db";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 
 import { Item } from "../baseItem";
-
 
 export type IService = {
   id: string;
   name: string;
   description: string;
-}
+};
 
 export class ServiceItem extends Item implements IService {
- static prefixService = "S#";
+  static prefixService = "S#";
 
   id: string;
   name: string;
@@ -34,7 +35,7 @@ export class ServiceItem extends Item implements IService {
   }
 
   get PK() {
-    return ServiceItem.prefixService + this.id;
+    return ServiceItem.prefixService;
   }
 
   get SK() {
@@ -51,10 +52,20 @@ export class ServiceItem extends Item implements IService {
 
   static fromItem(item: Record<string, unknown>): ServiceItem {
     return new ServiceItem({
-      id: (item.PK as string).replace(ServiceItem.prefixService, ""),
+      id: (item.SK as string).replace(ServiceItem.prefixService, ""),
       name: item.name as string,
       description: item.description as string,
     });
+  }
+
+  static buildKey(id: string): {
+    PK: string;
+    SK: string;
+  } {
+    return {
+      PK: ServiceItem.prefixService,
+      SK: ServiceItem.prefixService + id,
+    };
   }
 }
 
@@ -83,8 +94,8 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
           body: JSON.stringify(res),
         };
       }
-      case "PUT":
-       { const id = event.pathParameters?.serviceId;
+      case "PUT": {
+        const id = event.pathParameters?.serviceId;
         if (!id) {
           return {
             statusCode: 400,
@@ -103,20 +114,22 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
         return {
           statusCode: 200,
           body: JSON.stringify(service),
-          };}
-      case "DELETE":
-        {const id = event.pathParameters?.serviceId;
-          if (!id) {
-            return {
-              statusCode: 400,
-              body: "Bad Request",
-            };
-          }
-         await deleteService(id);
+        };
+      }
+      case "DELETE": {
+        const id = event.pathParameters?.serviceId;
+        if (!id) {
+          return {
+            statusCode: 400,
+            body: "Bad Request",
+          };
+        }
+        await deleteService(id);
         return {
           statusCode: 200,
           body: JSON.stringify({}),
-        };}
+        };
+      }
       default:
         return {
           statusCode: 405,
@@ -136,50 +149,28 @@ async function getServices(): Promise<IService[]> {
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-      KeyConditionExpression: "PK = :pk",
+      KeyConditionExpression: "PK = :pk and begins_with(SK, :sk)",
       ExpressionAttributeValues: {
         ":pk": ServiceItem.prefixService,
+        ":sk": ServiceItem.prefixService,
       },
     })
   );
-  const keys = result.Items?.map((item) => ({
-    PK: item.SK,
-    SK: item.SK,
-  }));
-  const services = await ddbDocClient.send(
-    new BatchGetCommand({
-      RequestItems: {
-        [TableName]: {
-          Keys: keys,
-        },
-      },
-    })
-  );
-  return (services.Responses?.[TableName] || []).map((item) =>ServiceItem.fromItem(item));
+
+  return result.Items?.map((item) => ServiceItem.fromItem(item)) || [];
 }
 
-async function createService({ name, description }: Omit<IService, "id">): Promise<IService> {
+async function createService({
+  name,
+  description,
+}: Omit<IService, "id">): Promise<IService> {
   const id = ulid();
   const serviceItem = new ServiceItem({ id, name, description });
+
   await ddbDocClient.send(
-    new TransactWriteCommand({
-      TransactItems: [
-        {
-          Put: {
-            TableName,
-            Item: serviceItem.toItem(),
-          },
-        },
-        {
-          Put: {
-            TableName,
-            Item: {
-              PK: ServiceItem.prefixService,
-              SK:serviceItem.PK 
-            },
-          },
-        },
-      ],
+    new PutCommand({
+      TableName,
+      Item: serviceItem.toItem(),
     })
   );
 
@@ -191,44 +182,37 @@ async function createService({ name, description }: Omit<IService, "id">): Promi
 }
 
 async function updateService(service: IService): Promise<IService> {
-  
   const serviceItem = new ServiceItem(service);
-  await ddbDocClient.send(new UpdateCommand({
-    TableName,
-    Key: serviceItem.keys() ,
+  await ddbDocClient.send(
+    new UpdateCommand({
+      TableName,
+      Key: serviceItem.keys(),
 
-    UpdateExpression: "set #n = :n, #d = :d",
-    ExpressionAttributeNames: { "#n": "name", "#d": "description" },
-    ExpressionAttributeValues: { ":n": service.name, ":d": service.description },
-    ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
-    ReturnValues: "ALL_NEW",
-  }));
+      UpdateExpression: "set #n = :n, #d = :d",
+      ExpressionAttributeNames: { "#n": "name", "#d": "description" },
+      ExpressionAttributeValues: {
+        ":n": service.name,
+        ":d": service.description,
+      },
+      ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+      ReturnValues: "ALL_NEW",
+    })
+  );
 
   return service;
 }
 
-async function deleteService(id: string)  {
-  
-  await ddbDocClient.send(new TransactWriteCommand({
-    TransactItems: [
-      {
-        Delete: {
-          TableName,
-          Key: { PK: ServiceItem. prefixService + id, SK: ServiceItem. prefixService + id },
-          ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
-        }
-      ,
+async function deleteService(id: string) {
+  await ddbDocClient.send(
+    new DeleteCommand({
+      TableName,
+      Key: {
+        PK: ServiceItem.prefixService,
+        SK: ServiceItem.prefixService + id,
       },
-      {
-        Delete: {
-          TableName,
-          Key: { PK: ServiceItem. prefixService, SK: ServiceItem. prefixService + id },
-          ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
-        }
-      ,
-      },
-    ],
-  }));
+      ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+    })
+  );
 
   return {
     statusCode: 204,

@@ -10,24 +10,23 @@ import { TableName } from "../db";
 import { ulid } from "ulid";
 import { getServiceFromServicePointsIds } from "../servicePoints/servicePoints";
 import { Item } from "../baseItem";
+import { ServiceItem } from "../services/services";
 
 const prefixServiceQueue = "SQ#";
-export const prefixQueue = "Q#";
-export const prefixQueueStatus = "Q_STATUS#";
-export const buildQueueKey = (serviceId: string) =>
-  `${prefixServiceQueue}${serviceId}`;
+const prefixQueue = "Q#";
+const prefixQueueStatus = "Q_STATUS#";
 
 export enum QueueStatus {
-  QUEUED = "00-queued",
-  PENDING = "01-pending",
-  IN_SERVICE = "02-in-service",
-  SERVED = "03-served",
-  SKIPPED = "04-skipped",
+  QUEUED = "queued",
+  PENDING = "pending",
+  IN_SERVICE = "in-service",
+  SERVED = "served",
+  SKIPPED = "skipped",
 }
 
 export enum QueuePriority {
-  high = "00-high",
-  medium = "01-medium",
+  high = "1",
+  medium = "5",
 }
 
 export interface IQueueItem {
@@ -55,24 +54,20 @@ export class QueueItem extends Item {
     this.dateISOString = queueItem.dateISOString;
   }
   get PK(): string {
-    return QueueItem.prefix + this.id;
+    return QueueItem.prefix;
   }
   get SK(): string {
-    return QueueItem.prefix + this.id;
+    return QueueItem.buildKey(this.id).SK;
   }
 
   get GSI1PK(): string {
-    return buildQueueKey(this.serviceId);
+    return prefixServiceQueue + this.serviceId;
   }
-
   // sort order in queue
   get GSI1SK(): string {
-    return this.buildQueueSK({
-      status: this.status,
-      priority: this.priority,
-      dateISOString: this.dateISOString,
-    });
+    return `${prefixQueueStatus}${this.status}Q_PRIORITY#${this.priority}#Q_DATE${this.dateISOString}`;
   }
+
   toItem(): Record<string, unknown> {
     return {
       ...this.keys(),
@@ -85,33 +80,22 @@ export class QueueItem extends Item {
     };
   }
 
-  private buildQueueSK({
-    status,
-    priority,
-    dateISOString,
-  }: {
-    status: QueueStatus;
-    priority: QueuePriority;
-    dateISOString: string;
-  }) {
-    return `${prefixQueueStatus}${status}Q_PRIORITY#${priority}#Q_DATE${dateISOString}`;
-  }
-
   static fromItem(item: Record<string, unknown>): QueueItem {
     return new QueueItem({
-      id: (item.PK as string).replace(QueueItem.prefix, ""),
+      id: (item.SK as string).replace(QueueItem.prefix, ""),
       serviceId: item.serviceId as string,
       status: item.status as QueueStatus,
       priority: item.priority as QueuePriority,
       dateISOString: item.dateISOString as string,
     });
   }
+
   static buildKey(queueId: string): {
     PK: string;
     SK: string;
   } {
     return {
-      PK: QueueItem.prefix + queueId,
+      PK: QueueItem.prefix,
       SK: QueueItem.prefix + queueId,
     };
   }
@@ -290,7 +274,7 @@ async function getQueueItems({
       IndexName: "GSI1",
       KeyConditionExpression: "GSI1PK = :gsi1pk",
       ExpressionAttributeValues: {
-        ":gsi1pk": buildQueueKey(serviceId),
+        ":gsi1pk": `${prefixServiceQueue}${serviceId}`,
       },
       ScanIndexForward: true,
     })
@@ -322,9 +306,19 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
     dateISOString: new Date().toISOString(),
   });
 
+  const serviceKey = ServiceItem.buildKey(serviceId);
+
   await ddbDocClient.send(
     new TransactWriteCommand({
       TransactItems: [
+        {
+          ConditionCheck: {
+            TableName,
+            Key: serviceKey,
+            ConditionExpression:
+              "attribute_exists(PK) AND attribute_exists(SK)",
+          },
+        },
         {
           Put: {
             TableName,
@@ -471,7 +465,7 @@ export async function getQueuedItems({
       KeyConditionExpression:
         "GSI1PK = :gsi1pk and begins_with(GSI1SK, :gsi1sk)",
       ExpressionAttributeValues: {
-        ":gsi1pk": buildQueueKey(serviceId),
+        ":gsi1pk": `${prefixServiceQueue}#${serviceId}`,
         ":gsi1sk": prefixQueueStatus + status,
       },
       Limit: limit,
