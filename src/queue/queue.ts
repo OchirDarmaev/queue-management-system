@@ -457,7 +457,7 @@ export async function getQueuedItems({
   serviceId: string;
   limit: number;
   status: QueueStatus;
-}) {
+}): Promise<QueueItem[]> {
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
@@ -465,7 +465,7 @@ export async function getQueuedItems({
       KeyConditionExpression:
         "GSI1PK = :gsi1pk and begins_with(GSI1SK, :gsi1sk)",
       ExpressionAttributeValues: {
-        ":gsi1pk": `${prefixServiceQueue}#${serviceId}`,
+        ":gsi1pk": `${prefixServiceQueue}${serviceId}`,
         ":gsi1sk": prefixQueueStatus + status,
       },
       Limit: limit,
@@ -473,16 +473,5 @@ export async function getQueuedItems({
     })
   );
 
-  return (
-    result.Items?.map((item) => {
-      const i = QueueItem.fromItem(item);
-      return {
-        id: i.id,
-        serviceId: i.serviceId,
-        status: i.status,
-        priority: i.priority,
-        dateISOString: i.dateISOString,
-      };
-    }) ?? []
-  );
+  return result.Items?.map((item) => QueueItem.fromItem(item)) ?? [];
 }

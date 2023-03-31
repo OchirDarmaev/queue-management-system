@@ -27,7 +27,10 @@ export type IServicePoint = {
   name: string;
   description: string;
   servicePointStatus: ServicePointStatus;
-  currentItem?: string;
+  currentItem?: {
+    PK: string;
+    SK: string;
+  };
 };
 
 export class ServicePointItem extends Item {
@@ -37,7 +40,10 @@ export class ServicePointItem extends Item {
   public name: string;
   public description: string;
   public servicePointStatus: ServicePointStatus;
-  public currentQueueItem?: string;
+  public currentQueueItem?: {
+    PK: string;
+    SK: string;
+  };
   constructor(servicePoint: Partial<IServicePoint>) {
     super();
     this.id = servicePoint.id || ulid();
@@ -64,7 +70,10 @@ export class ServicePointItem extends Item {
       name: item.name as string,
       description: item.description as string,
       servicePointStatus: item.servicePointStatus as ServicePointStatus,
-      currentItem: item.currentItem as string,
+      currentItem: item.currentItem as {
+        PK: string;
+        SK: string;
+      },
     });
   }
 
@@ -494,7 +503,7 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
               UpdateExpression:
                 "SET currentItem = :currentItem, servicePointStatus = :servicePointStatus",
               ExpressionAttributeValues: {
-                ":currentItem": queueItem.PK,
+                ":currentItem": queueItem.keys(),
                 ":servicePointStatus": ServicePointStatus.WAITING,
               },
               ConditionExpression:
@@ -516,10 +525,7 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
   const res = await ddbDocClient.send(
     new GetCommand({
       TableName,
-      Key: {
-        PK: servicePoint.currentQueueItem,
-        SK: servicePoint.currentQueueItem,
-      },
+      Key: servicePoint.currentQueueItem,
     })
   );
 
@@ -569,10 +575,7 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
   const res = await ddbDocClient.send(
     new GetCommand({
       TableName,
-      Key: {
-        PK: servicePoint.currentQueueItem,
-        SK: servicePoint.currentQueueItem,
-      },
+      Key: servicePoint.currentQueueItem,
     })
   );
 
@@ -623,10 +626,7 @@ async function markAsServed(servicePoint: ServicePointItem) {
   const res = await ddbDocClient.send(
     new GetCommand({
       TableName,
-      Key: {
-        PK: servicePoint.currentQueueItem,
-        SK: servicePoint.currentQueueItem,
-      },
+      Key: servicePoint.currentQueueItem,
     })
   );
   // const status = QueueStatus.SERVED;
@@ -699,6 +699,8 @@ export async function getServiceFromServicePointsIds(): Promise<string[]> {
       ExpressionAttributeValues: {
         ":pk": ServicePointItem.prefixServicePoint,
       },
+      ProjectionExpression: "serviceIds",
+      Select: "SPECIFIC_ATTRIBUTES",
     })
   );
 
@@ -706,22 +708,5 @@ export async function getServiceFromServicePointsIds(): Promise<string[]> {
     return [];
   }
 
-  const keys = result.Items.map((item) => ({
-    PK: item.SK,
-    SK: item.SK,
-  }));
-  const servicePoints = await ddbDocClient.send(
-    new BatchGetCommand({
-      RequestItems: {
-        [TableName]: {
-          Keys: keys,
-        },
-      },
-    })
-  );
-  const serviceIds = servicePoints.Responses?.[TableName]?.flatMap(
-    (item) => item.serviceIds
-  );
-
-  return [...new Set(serviceIds)];
+  return [...new Set(result.Items.flatMap((item) => item.serviceIds))];
 }
