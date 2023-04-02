@@ -216,7 +216,7 @@ export const updateServicePointHandler: APIGatewayProxyHandler = async (
   }
 };
 
-export const deleteServicePointHandler: APIGatewayProxyHandler = async (
+export const removeServicePointHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
@@ -365,8 +365,14 @@ async function updateServicePoint(
         "SET " +
         Object.entries(servicePoint)
           .filter(([key, value]) => value !== undefined)
-          .map(([key, value]) => `${key} = :${key}`)
+          .map(([key, value]) => `#${key} = :${key}`)
           .join(", "),
+      ExpressionAttributeNames: Object.entries(servicePoint)
+        .filter(([key, value]) => value !== undefined)
+        .reduce((acc, [key, value]) => {
+          acc[`#${key}`] = key;
+          return acc;
+        }, {}),
       ExpressionAttributeValues: Object.entries(servicePoint)
 
         .filter(([key, value]) => value !== undefined)
