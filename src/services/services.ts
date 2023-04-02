@@ -8,6 +8,7 @@ import {
   TransactWriteCommand,
   PutCommand,
   DeleteCommand,
+  GetCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { TableName } from "../db";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
@@ -144,6 +145,44 @@ export const handler: APIGatewayProxyHandler = async (event, context) => {
     };
   }
 };
+
+// getServiceHandler
+export const getServiceHandler: APIGatewayProxyHandler = async (
+  event,
+  context
+) => {
+  try {
+    const id = event.pathParameters?.serviceId;
+    if (!id) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
+    const service = await getService(id);
+    return {
+      statusCode: 200,
+      body: JSON.stringify(service),
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      body: "Internal Server Error",
+    };
+  }
+};
+
+async function getService(id: string): Promise<IService> {
+  const result = await ddbDocClient.send(
+    new GetCommand({ TableName, Key: ServiceItem.buildKey(id) })
+  );
+
+  if (!result.Item) {
+    throw new Error("Not Found");
+  }
+  return ServiceItem.fromItem(result.Item);
+}
 
 async function getServices(): Promise<IService[]> {
   const result = await ddbDocClient.send(

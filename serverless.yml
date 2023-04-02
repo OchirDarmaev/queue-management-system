@@ -75,6 +75,13 @@ functions:
       - http:
           method: GET
           path: /services
+
+  getService:
+    handler: src/services/services.getServiceHandler
+    events:
+      - http:
+          method: GET
+          path: /services/{serviceId}
   updateService:
     handler: src/services/services.handler
     events:
