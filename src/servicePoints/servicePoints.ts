@@ -342,7 +342,7 @@ async function updateServicePoint(
         RequestItems: {
           [TableName]: {
             Keys: servicePoint.serviceIds.map((id) => ({
-              PK: ServiceItem.prefixService + id,
+              PK: ServiceItem.prefixService,
               SK: ServiceItem.prefixService + id,
             })),
           },
@@ -362,17 +362,22 @@ async function updateServicePoint(
       TableName,
       Key: new ServicePointItem(servicePoint).keys(),
       UpdateExpression:
-        "SET serviceIds = :serviceIds, servicePointName = :name, description = :description",
-      ExpressionAttributeValues: {
-        ":serviceIds": servicePoint.serviceIds,
-        ":name": servicePoint.name,
-        ":description": servicePoint.description,
-      },
+        "SET " +
+        Object.entries(servicePoint)
+          .filter(([key, value]) => value !== undefined)
+          .map(([key, value]) => `${key} = :${key}`)
+          .join(", "),
+      ExpressionAttributeValues: Object.entries(servicePoint)
+
+        .filter(([key, value]) => value !== undefined)
+        .reduce((acc, [key, value]) => {
+          acc[`:${key}`] = value;
+          return acc;
+        }, {}),
       ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
       ReturnValues: "ALL_NEW",
     })
   );
-
   if (!result.Attributes) {
     throw new Error("Service point not found");
   }
