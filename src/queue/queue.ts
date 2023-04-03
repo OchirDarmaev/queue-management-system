@@ -32,9 +32,9 @@ export enum QueuePriority {
 export interface IQueueItem {
   id: string;
   serviceId: string;
-  status: QueueStatus;
+  queueStatus: QueueStatus;
   priority: QueuePriority;
-  dateISOString: string;
+  date: string;
 }
 
 export class QueueItem extends Item {
@@ -42,16 +42,16 @@ export class QueueItem extends Item {
 
   public id: string;
   public serviceId: string;
-  public status: QueueStatus;
+  public queueStatus: QueueStatus;
   public priority: QueuePriority;
-  public dateISOString: string;
+  public date: string;
   constructor(queueItem: IQueueItem) {
     super();
     this.id = queueItem.id;
     this.serviceId = queueItem.serviceId;
-    this.status = queueItem.status;
+    this.queueStatus = queueItem.queueStatus;
     this.priority = queueItem.priority;
-    this.dateISOString = queueItem.dateISOString;
+    this.date = queueItem.date;
   }
   get PK(): string {
     return QueueItem.prefix;
@@ -63,18 +63,18 @@ export class QueueItem extends Item {
   get GSI1PK(): string {
     return prefixServiceQueue + this.serviceId;
   }
-  // sort order in queue
+
   get GSI1SK(): string {
-    return `${prefixQueueStatus}${this.status}Q_PRIORITY#${this.priority}#Q_DATE${this.dateISOString}`;
+    return `${prefixQueueStatus}${this.queueStatus}Q_PRIORITY#${this.priority}#Q_DATE${this.date}`;
   }
 
   toItem(): Record<string, unknown> {
     return {
       ...this.keys(),
       serviceId: this.serviceId,
-      status: this.status,
+      queueStatus: this.queueStatus,
       priority: this.priority,
-      dateISOString: this.dateISOString,
+      date: this.date,
       GSI1PK: this.GSI1PK,
       GSI1SK: this.GSI1SK,
     };
@@ -84,9 +84,9 @@ export class QueueItem extends Item {
     return new QueueItem({
       id: (item.SK as string).replace(QueueItem.prefix, ""),
       serviceId: item.serviceId as string,
-      status: item.status as QueueStatus,
+      queueStatus: item.queueStatus as QueueStatus,
       priority: item.priority as QueuePriority,
-      dateISOString: item.dateISOString as string,
+      date: item.date as string,
     });
   }
 
@@ -200,10 +200,10 @@ export const updateQueueItemHandler: APIGatewayProxyHandler = async (
         body: "Bad Request",
       };
     }
-    const { status, priority } = JSON.parse(event.body);
+    const { queueStatus, priority } = JSON.parse(event.body);
     const res = await updateQueueItem({
       queueId,
-      status,
+      queueStatus,
       priority,
     });
     return {
@@ -219,7 +219,6 @@ export const updateQueueItemHandler: APIGatewayProxyHandler = async (
   }
 };
 
-// getQueueStatusHandler
 export const getQueueStatusHandler: APIGatewayProxyHandler = async (
   event,
   context
@@ -286,9 +285,9 @@ async function getQueueItems({
       return {
         id: i.id,
         serviceId: i.serviceId,
-        status: i.status,
+        queueStatus: i.queueStatus,
         priority: i.priority,
-        dateISOString: i.dateISOString,
+        date: i.date,
       };
     }) || []
   );
@@ -301,9 +300,9 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   const queueItem = new QueueItem({
     id: ulid(),
     serviceId,
-    status: QueueStatus.QUEUED,
+    queueStatus: QueueStatus.QUEUED,
     priority: QueuePriority.medium,
-    dateISOString: new Date().toISOString(),
+    date: new Date().toISOString(),
   });
 
   const serviceKey = ServiceItem.buildKey(serviceId);
@@ -370,46 +369,14 @@ async function updateQueueItem({
   queueId,
 
   priority,
-  dateISOString,
+  date,
 }: {
   queueId: string;
-  status?: QueueStatus;
+  queueStatus?: QueueStatus;
   priority?: QueuePriority;
-  dateISOString?: string;
+  date?: string;
 }) {
   throw new Error("Not implemented");
-
-  //need to update GSI1SK when updating priority or date
-
-  //   const item = await getQueueItem({ queueId });
-  //   const newPriority = priority ?? item.priority;
-  //   const newDate = dateISOString ?? item.dateISOString;
-  // const gsi1sk =buildQueueSK({
-  //   status: item.status ,
-  //   priority: newPriority,
-  //   dateISOString: newDate,
-  // });
-  //   await ddbDocClient.send(
-  //     new UpdateCommand({
-  //       TableName,
-  //       Key: {
-  //         PK: prefixQueue + queueId,
-  //         SK: prefixQueue + queueId,
-  //       },
-  //       UpdateExpression:
-  //         "SET GSI1SK = :gsi1sk,  #priority = :priority, #dateISOString = :dateISOString",
-  //       ExpressionAttributeNames: {
-  //         "#queueStatus": "queueStatus",
-  //         "#priority": "priority",
-  //         "#dateISOString": "dateISOString",
-  //       },
-  //       ExpressionAttributeValues: {
-  //         ":gsi1sk": gsi1sk,
-  //         ":priority": newPriority,
-  //         ":dateISOString": newDate,
-  //       },
-  //     })
-  //   );
 }
 
 async function getQueuedInfo() {
@@ -431,13 +398,13 @@ export async function getItemsByStatus({
   limit: number;
 }): Promise<Partial<Record<QueueStatus, QueueItem[]>>> {
   const itemsByStatus = await Promise.all(
-    queueStatuses.map(async (status) => ({
-      status,
+    queueStatuses.map(async (queueStatus) => ({
+      queueStatus: queueStatus,
       // to do take a look order issue
       items: (
         await Promise.all(
           serviceIds.map((serviceId) =>
-            getQueuedItems({ serviceId, limit, status })
+            getQueuedItems({ serviceId, limit, queueStatus })
           )
         )
       ).flat(),
@@ -445,18 +412,18 @@ export async function getItemsByStatus({
   );
 
   return Object.fromEntries(
-    itemsByStatus.map((item) => [item.status, item.items])
+    itemsByStatus.map((item) => [item.queueStatus, item.items])
   );
 }
 
 export async function getQueuedItems({
   serviceId,
   limit,
-  status,
+  queueStatus,
 }: {
   serviceId: string;
   limit: number;
-  status: QueueStatus;
+  queueStatus: QueueStatus;
 }): Promise<QueueItem[]> {
   const result = await ddbDocClient.send(
     new QueryCommand({
@@ -466,7 +433,7 @@ export async function getQueuedItems({
         "GSI1PK = :gsi1pk and begins_with(GSI1SK, :gsi1sk)",
       ExpressionAttributeValues: {
         ":gsi1pk": `${prefixServiceQueue}${serviceId}`,
-        ":gsi1sk": prefixQueueStatus + status,
+        ":gsi1sk": prefixQueueStatus + queueStatus,
       },
       Limit: limit,
       ScanIndexForward: true,
