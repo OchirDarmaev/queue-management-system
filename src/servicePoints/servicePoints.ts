@@ -279,7 +279,7 @@ export const updateServicePointStatusHandler: APIGatewayProxyHandler = async (
   }
 };
 
-async function getServicePoints() {
+export async function getServicePoints() {
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
@@ -469,14 +469,15 @@ async function updateServicePointStatus({
 async function startWaitingQueue(servicePoint: ServicePointItem) {
   if (!servicePoint.currentQueueItem) {
     const itemsByStatus = await getItemsByStatus({
-      serviceIds: servicePoint.serviceIds,
-      queueStatuses: [QueueStatus.QUEUED],
+      servicePoints: [servicePoint],
       limit: 1,
     });
-    const queueItem = itemsByStatus[QueueStatus.QUEUED]?.[0];
+    const queueItem = itemsByStatus.items?.[0];
     if (!queueItem) {
       throw new Error("No item in queue");
     }
+
+    const oldKeys = queueItem.keys();
 
     queueItem.queueStatus = QueueStatus.PENDING;
 
@@ -484,20 +485,17 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
       new TransactWriteCommand({
         TransactItems: [
           {
-            Update: {
-              TableName: TableName,
-              Key: queueItem.keys(),
-              UpdateExpression:
-                "SET #queueStatus = :queueStatus, GSI1SK = :gsi1sk",
-              ExpressionAttributeNames: {
-                "#queueStatus": "queueStatus",
-              },
-              ExpressionAttributeValues: {
-                ":queueStatus": queueItem.queueStatus,
-                ":gsi1sk": queueItem.GSI1SK,
-              },
+            Delete: {
+              TableName,
+              Key: oldKeys,
               ConditionExpression:
                 "attribute_exists(PK) and attribute_exists(SK)",
+            },
+          },
+          {
+            Put: {
+              TableName: TableName,
+              Item: queueItem.toItem(),
             },
           },
           {
@@ -532,23 +530,25 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
     throw new Error("Queue item not found");
   }
   const queueItem = QueueItem.fromItem(res.Item);
+
+  const oldKeys = queueItem.keys();
   queueItem.queueStatus = QueueStatus.QUEUED;
 
   await ddbDocClient.send(
     new TransactWriteCommand({
       TransactItems: [
         {
-          Update: {
-            TableName: TableName,
-            Key: queueItem.keys(),
-            UpdateExpression:
-              "SET queueStatus = :queueStatus, GSI1SK = :gsi1sk",
-            ExpressionAttributeValues: {
-              ":queueStatus": queueItem.queueStatus,
-              ":gsi1sk": queueItem.GSI1SK,
-            },
+          Delete: {
+            TableName,
+            Key: oldKeys,
             ConditionExpression:
               "attribute_exists(PK) and attribute_exists(SK)",
+          },
+        },
+        {
+          Put: {
+            TableName: TableName,
+            Item: queueItem.toItem(),
           },
         },
         {
@@ -580,31 +580,36 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
     throw new Error("Queue item not found");
   }
   const queueItem = QueueItem.fromItem(res.Item);
+  const oldKeys = queueItem.keys();
   queueItem.queueStatus = QueueStatus.IN_SERVICE;
 
   await ddbDocClient.send(
     new TransactWriteCommand({
       TransactItems: [
         {
-          Update: {
+          Delete: {
+            TableName,
+            Key: oldKeys,
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK)",
+          },
+        },
+        {
+          Put: {
             TableName: TableName,
-            Key: queueItem.keys(),
-            UpdateExpression:
-              "SET queueStatus = :queueStatus, GSI1SK = :gsi1sk",
-            ExpressionAttributeValues: {
-              ":queueStatus": queueItem.queueStatus,
-              ":gsi1sk": queueItem.GSI1SK,
-            },
+            Item: queueItem.toItem(),
           },
         },
         {
           Update: {
             TableName: TableName,
             Key: servicePoint.keys(),
-            UpdateExpression: "SET servicePointStatus = :servicePointStatus",
+            UpdateExpression: "SET servicePointStatus = :servicePointStatus, currentItem = :currentItem",
             ExpressionAttributeValues: {
               ":servicePointStatus": ServicePointStatus.IN_SERVICE,
+              ":currentItem": queueItem.keys(),
             },
+
             ConditionExpression:
               "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentItem)",
           },
@@ -626,23 +631,24 @@ async function markAsServed(servicePoint: ServicePointItem) {
     throw new Error("Queue item not found");
   }
   const queueItem = QueueItem.fromItem(res.Item);
+  const oldKeys = queueItem.keys();
   queueItem.queueStatus = QueueStatus.SERVED;
 
   await ddbDocClient.send(
     new TransactWriteCommand({
       TransactItems: [
         {
-          Update: {
-            TableName: TableName,
-            Key: queueItem.keys(),
-            UpdateExpression:
-              "SET queueStatus = :queueStatus, GSI1SK = :gsi1sk",
-            ExpressionAttributeValues: {
-              ":queueStatus": queueItem.queueStatus,
-              ":gsi1sk": queueItem.GSI1SK,
-            },
+          Delete: {
+            TableName,
+            Key: oldKeys,
             ConditionExpression:
               "attribute_exists(PK) and attribute_exists(SK)",
+          },
+        },
+        {
+          Put: {
+            TableName: TableName,
+            Item: queueItem.toItem(),
           },
         },
         {
@@ -677,22 +683,22 @@ async function closeServicePoint(servicePoint: ServicePointItem) {
   );
 }
 
-export async function getServiceFromServicePointsIds(): Promise<string[]> {
-  const result = await ddbDocClient.send(
-    new QueryCommand({
-      TableName,
-      KeyConditionExpression: "PK = :pk",
-      ExpressionAttributeValues: {
-        ":pk": ServicePointItem.prefixServicePoint,
-      },
-      ProjectionExpression: "serviceIds",
-      Select: "SPECIFIC_ATTRIBUTES",
-    })
-  );
+// export async function getServiceFromServicePointsIds(): Promise<string[]> {
+//   const result = await ddbDocClient.send(
+//     new QueryCommand({
+//       TableName,
+//       KeyConditionExpression: "PK = :pk",
+//       ExpressionAttributeValues: {
+//         ":pk": ServicePointItem.prefixServicePoint,
+//       },
+//       ProjectionExpression: "serviceIds",
+//       Select: "SPECIFIC_ATTRIBUTES",
+//     })
+//   );
 
-  if (!result.Items?.length) {
-    return [];
-  }
+//   if (!result.Items?.length) {
+//     return [];
+//   }
 
-  return [...new Set(result.Items.flatMap((item) => item.serviceIds))];
-}
+//   return [...new Set(result.Items.flatMap((item) => item.serviceIds))];
+// }

@@ -14,7 +14,7 @@ Assign a service to a service point - Service Point Table,"Service Point Table, 
 "Change the position item in the queue (reordering in case some client is an old man): Retrieve the item, remove it from the queue, update the priority and SK, and add the item back to the queue.",,,
 "Update status: Retrieve the item, update item in GSI1SK",,,
 "Get the first queued item: Query operation with PK = 'STATUS#queued' and Limit = 1.",,,
-"Get all query items by each status"
+"Get all queue items by each status"
 "Next client","queue table","SP_ID", "Transaction: update client status, update service point status"
 
  

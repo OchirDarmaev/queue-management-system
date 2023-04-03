@@ -1,18 +1,22 @@
 import {
-  GetCommand,
   TransactWriteCommand,
-  UpdateCommand,
   QueryCommand,
+  BatchGetCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { APIGatewayProxyHandler } from "aws-lambda";
 import { ddbDocClient } from "../dynamoDB";
 import { TableName } from "../db";
 import { ulid } from "ulid";
-import { getServiceFromServicePointsIds } from "../servicePoints/servicePoints";
 import { Item } from "../baseItem";
 import { ServiceItem } from "../services/services";
+import {
+  ServicePointItem,
+  getServicePointHandler,
+  getServicePoints,
+  getServicePointsHandler,
+} from "../servicePoints/servicePoints";
+import { BatchGetItemCommand } from "@aws-sdk/client-dynamodb";
 
-const prefixServiceQueue = "SQ#";
 const prefixQueue = "Q#";
 const prefixQueueStatus = "Q_STATUS#";
 
@@ -47,24 +51,15 @@ export class QueueItem extends Item {
   public date: string;
   constructor(queueItem: IQueueItem) {
     super();
-    this.id = queueItem.id;
     this.serviceId = queueItem.serviceId;
     this.queueStatus = queueItem.queueStatus;
     this.priority = queueItem.priority;
     this.date = queueItem.date;
   }
   get PK(): string {
-    return QueueItem.prefix;
+    return QueueItem.prefix + ServiceItem.prefixService + this.serviceId;
   }
   get SK(): string {
-    return QueueItem.buildKey(this.id).SK;
-  }
-
-  get GSI1PK(): string {
-    return prefixServiceQueue + this.serviceId;
-  }
-
-  get GSI1SK(): string {
     return `${prefixQueueStatus}${this.queueStatus}Q_PRIORITY#${this.priority}#Q_DATE${this.date}`;
   }
 
@@ -75,8 +70,6 @@ export class QueueItem extends Item {
       queueStatus: this.queueStatus,
       priority: this.priority,
       date: this.date,
-      GSI1PK: this.GSI1PK,
-      GSI1SK: this.GSI1SK,
     };
   }
 
@@ -131,34 +124,36 @@ export const getQueueItemHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
-  try {
-    const queueId = event.pathParameters?.queueId;
-    if (!queueId) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const item = await getQueueItem({
-      queueId,
-    });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(item),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
+  throw new Error("Not implemented");
+  // try {
+  //   const queueId = event.pathParameters?.queueId;
+  //   if (!queueId) {
+  //     return {
+  //       statusCode: 400,
+  //       body: "Bad Request",
+  //     };
+  //   }
+  //   const item = await getQueueItem({
+  //     queueId,
+  //   });
+  //   return {
+  //     statusCode: 200,
+  //     body: JSON.stringify(item),
+  //   };
+  // } catch (error) {
+  //   console.error(error);
+  //   return {
+  //     statusCode: 500,
+  //     body: "Internal Server Error",
+  //   };
+  // }
 };
 
 export const getQueueItemsHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  throw new Error("Not implemented");
   try {
     const serviceId = event.pathParameters?.serviceId;
     if (!serviceId) {
@@ -185,6 +180,7 @@ export const updateQueueItemHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  throw new Error("Not implemented");
   try {
     const queueId = event.pathParameters?.queueId;
     if (!queueId) {
@@ -242,24 +238,21 @@ export async function getQueueItem({ queueId }: { queueId: string }): Promise<{
   item: QueueItem;
   queuePosition: number;
 }> {
-  const result = await ddbDocClient.send(
-    new GetCommand({
-      TableName,
-      Key: QueueItem.buildKey(queueId),
-    })
-  );
-
-  if (!result.Item) {
-    throw new Error("Queue item not found");
-  }
-
-  const item = QueueItem.fromItem(result.Item);
-  const queuePosition = await getQueuePosition(item);
-
-  return {
-    item,
-    queuePosition,
-  };
+  // const result = await ddbDocClient.send(
+  //   new GetCommand({
+  //     TableName,
+  //     Key: QueueItem.buildKey(queueId),
+  //   })
+  // );
+  // if (!result.Item) {
+  //   throw new Error("Queue item not found");
+  // }
+  // const item = QueueItem.fromItem(result.Item);
+  // const queuePosition = await getQueuePosition(item);
+  // return {
+  //   item,
+  //   queuePosition,
+  // };
 }
 
 async function getQueueItems({
@@ -270,10 +263,9 @@ async function getQueueItems({
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-      IndexName: "GSI1",
-      KeyConditionExpression: "GSI1PK = :gsi1pk",
+      KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: {
-        ":gsi1pk": `${prefixServiceQueue}${serviceId}`,
+        ":pk": `${QueueItem.prefix}${ServiceItem.prefix}${serviceId}`,
       },
       ScanIndexForward: true,
     })
@@ -337,22 +329,18 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   };
 }
 
-async function getQueuePosition({
-  GSI1PK,
-  GSI1SK,
-}: QueueItem): Promise<number> {
-  if (!GSI1SK.startsWith(prefixQueueStatus + QueueStatus.QUEUED)) {
-    throw new Error("Queue item is not queued");
+async function getQueuePosition(queueItem: QueueItem): Promise<number> {
+  if (!queueItem.SK.startsWith(prefixQueueStatus + QueueStatus.QUEUED)) {
+    return -1;
   }
 
   const queuePositionResult = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-      IndexName: "GSI1",
-      KeyConditionExpression: "GSI1PK = :gsi1pk and GSI1SK < :gsi1sk",
+      KeyConditionExpression: "PK = :pk AND SK < :sk",
       ExpressionAttributeValues: {
-        ":gsi1pk": GSI1PK,
-        ":gsi1sk": GSI1SK,
+        ":pk": queueItem.PK,
+        ":sk": queueItem.SK,
       },
       Select: "COUNT",
       ScanIndexForward: true,
@@ -367,7 +355,6 @@ async function getQueuePosition({
 
 async function updateQueueItem({
   queueId,
-
   priority,
   date,
 }: {
@@ -380,40 +367,61 @@ async function updateQueueItem({
 }
 
 async function getQueuedInfo() {
-  const serviceIds = await getServiceFromServicePointsIds();
+  const servicePoints = await getServicePoints();
   return await getItemsByStatus({
-    serviceIds,
-    queueStatuses: Object.values(QueueStatus),
+    servicePoints,
+
     limit: 10,
   });
 }
 
 export async function getItemsByStatus({
-  serviceIds,
-  queueStatuses,
+  servicePoints,
   limit,
 }: {
-  serviceIds: string[];
-  queueStatuses: QueueStatus[];
+  servicePoints: ServicePointItem[];
   limit: number;
-}): Promise<Partial<Record<QueueStatus, QueueItem[]>>> {
-  const itemsByStatus = await Promise.all(
-    queueStatuses.map(async (queueStatus) => ({
-      queueStatus: queueStatus,
-      // to do take a look order issue
-      items: (
-        await Promise.all(
-          serviceIds.map((serviceId) =>
-            getQueuedItems({ serviceId, limit, queueStatus })
-          )
-        )
-      ).flat(),
-    }))
+}): Promise<{
+  items: QueueItem[];
+  items2: QueueItem[];
+}> {
+  const serviceIds = [
+    ...new Set(
+      servicePoints.flatMap((servicePoint) => servicePoint.serviceIds)
+    ),
+  ];
+
+  const items = (
+    await Promise.all(
+      serviceIds.map((serviceId) =>
+        getQueuedItems({ serviceId, limit, queueStatus: QueueStatus.QUEUED })
+      )
+    )
+  ).flat();
+
+  const keys = servicePoints
+    .filter((x) => x.currentQueueItem)
+    .map((x) => x.currentQueueItem);
+  if (keys.length === 0) {
+    return {
+      items,
+      items2: [],
+    };
+  }
+  const { Responses } = await ddbDocClient.send(
+    new BatchGetCommand({
+      RequestItems: {
+        [TableName]: {
+          Keys: keys,
+        },
+      },
+    })
   );
 
-  return Object.fromEntries(
-    itemsByStatus.map((item) => [item.queueStatus, item.items])
-  );
+  return {
+    items,
+    items2: Responses?.[TableName]?.map((x) => QueueItem.fromItem(x)) ?? [],
+  };
 }
 
 export async function getQueuedItems({
@@ -428,12 +436,11 @@ export async function getQueuedItems({
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-      IndexName: "GSI1",
-      KeyConditionExpression:
-        "GSI1PK = :gsi1pk and begins_with(GSI1SK, :gsi1sk)",
+
+      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
       ExpressionAttributeValues: {
-        ":gsi1pk": `${prefixServiceQueue}${serviceId}`,
-        ":gsi1sk": prefixQueueStatus + queueStatus,
+        ":pk": `${QueueItem.prefix}${ServiceItem.prefixService}${serviceId}`,
+        ":sk": prefixQueueStatus + queueStatus,
       },
       Limit: limit,
       ScanIndexForward: true,
