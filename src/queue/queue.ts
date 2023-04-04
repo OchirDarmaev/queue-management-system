@@ -14,11 +14,8 @@ import { Item } from "../baseItem";
 import { ServiceItem } from "../services/services";
 import {
   ServicePointItem,
-  getServicePointHandler,
   getServicePoints,
-  getServicePointsHandler,
 } from "../servicePoints/servicePoints";
-import { BatchGetItemCommand } from "@aws-sdk/client-dynamodb";
 
 const prefixQueue = "Q#";
 const prefixQueueStatus = "Q_STATUS#";
@@ -42,6 +39,7 @@ export interface IQueueItem {
   queueStatus: QueueStatus;
   priority: QueuePriority;
   date: string;
+  memorableId: string;
 }
 
 export class QueueItem extends Item {
@@ -52,6 +50,7 @@ export class QueueItem extends Item {
   public queueStatus: QueueStatus;
   public priority: QueuePriority;
   public date: string;
+  public memorableId: string;
   constructor(queueItem: IQueueItem) {
     super();
     this.id = queueItem.id;
@@ -59,11 +58,20 @@ export class QueueItem extends Item {
     this.queueStatus = queueItem.queueStatus;
     this.priority = queueItem.priority;
     this.date = queueItem.date;
+    this.memorableId = queueItem.memorableId;
   }
   get PK(): string {
-    return QueueItem.prefix + ServiceItem.prefixService + this.serviceId;
+    return QueueItem.buildKey(this.id).PK;
   }
   get SK(): string {
+    return QueueItem.buildKey(this.id).SK;
+  }
+
+  get GSI1PK(): string {
+    return QueueItem.prefix + ServiceItem.prefixService + this.serviceId;
+  }
+
+  get GSI1SK(): string {
     return `${prefixQueueStatus}${this.queueStatus}Q_PRIORITY#${this.priority}#Q_DATE${this.date}`;
   }
 
@@ -74,6 +82,9 @@ export class QueueItem extends Item {
       queueStatus: this.queueStatus,
       priority: this.priority,
       date: this.date,
+      memorableId: this.memorableId,
+      GSI1PK: this.GSI1PK,
+      GSI1SK: this.GSI1SK,
     };
   }
 
@@ -84,6 +95,7 @@ export class QueueItem extends Item {
       queueStatus: item.queueStatus as QueueStatus,
       priority: item.priority as QueuePriority,
       date: item.date as string,
+      memorableId: item.memorableId as string,
     });
   }
 
@@ -157,7 +169,6 @@ export const getQueueItemsHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
-  throw new Error("Not implemented");
   try {
     const serviceId = event.pathParameters?.serviceId;
     if (!serviceId) {
@@ -184,7 +195,6 @@ export const updateQueueItemHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
-  throw new Error("Not implemented");
   try {
     const queueId = event.pathParameters?.queueId;
     if (!queueId) {
@@ -242,21 +252,22 @@ export async function getQueueItem({ queueId }: { queueId: string }): Promise<{
   item: QueueItem;
   queuePosition: number;
 }> {
-  // const result = await ddbDocClient.send(
-  //   new GetCommand({
-  //     TableName,
-  //     Key: QueueItem.buildKey(queueId),
-  //   })
-  // );
-  // if (!result.Item) {
-  //   throw new Error("Queue item not found");
-  // }
-  // const item = QueueItem.fromItem(result.Item);
-  // const queuePosition = await getQueuePosition(item);
-  // return {
-  //   item,
-  //   queuePosition,
-  // };
+  const result = await ddbDocClient.send(
+    new GetCommand({
+      TableName,
+      Key: QueueItem.buildKey(queueId),
+    })
+  );
+  if (!result.Item) {
+    throw new Error("Queue item not found");
+  }
+  const item = QueueItem.fromItem(result.Item);
+  const queuePosition = await getQueuePosition(item);
+
+  return {
+    item,
+    queuePosition,
+  };
 }
 
 async function getQueueItems({
@@ -269,7 +280,7 @@ async function getQueueItems({
       TableName,
       KeyConditionExpression: "PK = :pk",
       ExpressionAttributeValues: {
-        ":pk": `${QueueItem.prefix}${ServiceItem.prefix}${serviceId}`,
+        ":pk": `${QueueItem.prefix}${ServiceItem.prefixService}${serviceId}`,
       },
       ScanIndexForward: true,
     })
@@ -284,6 +295,7 @@ async function getQueueItems({
         queueStatus: i.queueStatus,
         priority: i.priority,
         date: i.date,
+        memorableId: i.memorableId,
       };
     }) || []
   );
@@ -292,16 +304,16 @@ async function getQueueItems({
 async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   item: QueueItem;
   queuePosition: number;
-  memorableId: string;
 }> {
   const id = ulid();
-  const { memorableId } = await createMemorableId(serviceId, id);
+  const memorableId = await createMemorableId(serviceId);
   const queueItem = new QueueItem({
     id,
     serviceId,
     queueStatus: QueueStatus.QUEUED,
     priority: QueuePriority.medium,
     date: new Date().toISOString(),
+    memorableId,
   });
 
   const serviceKey = ServiceItem.buildKey(serviceId);
@@ -333,22 +345,22 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   return {
     item: queueItem,
     queuePosition,
-    memorableId,
   };
 }
 
 async function getQueuePosition(queueItem: QueueItem): Promise<number> {
-  if (!queueItem.SK.startsWith(prefixQueueStatus + QueueStatus.QUEUED)) {
+  if (!queueItem.GSI1SK.startsWith(prefixQueueStatus + QueueStatus.QUEUED)) {
     return -1;
   }
 
   const queuePositionResult = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-      KeyConditionExpression: "PK = :pk AND SK < :sk",
+      IndexName: "GSI1",
+      KeyConditionExpression: "GSI1PK = :gsi1pk AND GSI1SK < :gsi1sk",
       ExpressionAttributeValues: {
-        ":pk": queueItem.PK,
-        ":sk": queueItem.SK,
+        ":gsi1pk": queueItem.GSI1PK,
+        ":gsi1sk": queueItem.GSI1SK,
       },
       Select: "COUNT",
       ScanIndexForward: true,
@@ -390,8 +402,11 @@ export async function getItemsByStatus({
   servicePoints: ServicePointItem[];
   limit: number;
 }): Promise<{
-  items: QueueItem[];
-  items2: QueueItem[];
+  itemsInQueue: QueueItem[];
+  itemsInProgress: {
+    servicePointNumber: string;
+    queueItem: QueueItem;
+  }[];
 }> {
   const serviceIds = [
     ...new Set(
@@ -399,7 +414,7 @@ export async function getItemsByStatus({
     ),
   ];
 
-  const items = (
+  const itemsInQueue = (
     await Promise.all(
       serviceIds.map((serviceId) =>
         getQueuedItems({ serviceId, limit, queueStatus: QueueStatus.QUEUED })
@@ -407,13 +422,13 @@ export async function getItemsByStatus({
     )
   ).flat();
 
-  const keys = servicePoints
-    .filter((x) => x.currentQueueItem)
-    .map((x) => x.currentQueueItem);
+  const serviceItemInProgress = servicePoints.filter((x) => x.currentQueueItem);
+
+  const keys = serviceItemInProgress.map((x) => x.currentQueueItem);
   if (keys.length === 0) {
     return {
-      items,
-      items2: [],
+      itemsInQueue: itemsInQueue,
+      itemsInProgress: [],
     };
   }
   const { Responses } = await ddbDocClient.send(
@@ -426,9 +441,16 @@ export async function getItemsByStatus({
     })
   );
 
+  const itemsInProgress =
+    Responses?.[TableName]?.map((x) => QueueItem.fromItem(x)) ?? [];
+  // const
+  // const servicePointByQueueId = Object.fromEntries(
+  //   serviceItemInProgress.map((x) => [x.currentQueueItem?.SK, x]
+  // )
+
   return {
-    items,
-    items2: Responses?.[TableName]?.map((x) => QueueItem.fromItem(x)) ?? [],
+    itemsInQueue: itemsInQueue,
+    itemsInProgress: [],
   };
 }
 
@@ -444,11 +466,12 @@ export async function getQueuedItems({
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-
-      KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
+      IndexName: "GSI1",
+      KeyConditionExpression:
+        "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
       ExpressionAttributeValues: {
-        ":pk": `${QueueItem.prefix}${ServiceItem.prefixService}${serviceId}`,
-        ":sk": prefixQueueStatus + queueStatus,
+        ":gsi1pk": `${QueueItem.prefix}${ServiceItem.prefixService}${serviceId}`,
+        ":gsi1sk": prefixQueueStatus + queueStatus,
       },
       Limit: limit,
       ScanIndexForward: true,
@@ -458,16 +481,11 @@ export async function getQueuedItems({
   return result.Items?.map((item) => QueueItem.fromItem(item)) ?? [];
 }
 
-// Pool ids '[A-z]-[0-9]{3}' (e.g. A-001...Z-999)
-// Rotate pool ids every 1000 ids
-// Divide clients into groups. Each group has a pool id
-
-export async function createMemorableId(
-  serviceId: string,
-  queueId: string
-): Promise<{
-  memorableId: string;
-}> {
+/**
+ * Pool ids '[A-z]-[0-9]{3}' (e.g. A-001...Z-999)
+ * */
+// todo Rotate pool ids every 1000 ids
+export async function createMemorableId(serviceId: string): Promise<string> {
   const prefixPoolIds = "PI#";
   const serviceItem = await ddbDocClient.send(
     new GetCommand({
@@ -501,18 +519,5 @@ export async function createMemorableId(
 
   const counter = res.Attributes?.counter;
 
-  const memorableId =
-    firstLetterServiceName + "-" + counter.toString().padStart(3, "0");
-  await ddbDocClient.send(
-    new PutCommand({
-      TableName,
-      Item: {
-        PK: prefixPoolIds + poolName,
-        SK: memorableId,
-        id: QueueItem.prefix + queueId,
-      },
-    })
-  );
-
-  return { memorableId };
+  return firstLetterServiceName + "-" + counter.toString().padStart(3, "0");
 }
