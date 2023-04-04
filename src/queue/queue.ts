@@ -2,6 +2,9 @@ import {
   TransactWriteCommand,
   QueryCommand,
   BatchGetCommand,
+  UpdateCommand,
+  PutCommand,
+  GetCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { APIGatewayProxyHandler } from "aws-lambda";
 import { ddbDocClient } from "../dynamoDB";
@@ -51,6 +54,7 @@ export class QueueItem extends Item {
   public date: string;
   constructor(queueItem: IQueueItem) {
     super();
+    this.id = queueItem.id;
     this.serviceId = queueItem.serviceId;
     this.queueStatus = queueItem.queueStatus;
     this.priority = queueItem.priority;
@@ -288,9 +292,12 @@ async function getQueueItems({
 async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   item: QueueItem;
   queuePosition: number;
+  memorableId: string;
 }> {
+  const id = ulid();
+  const { memorableId } = await createMemorableId(serviceId, id);
   const queueItem = new QueueItem({
-    id: ulid(),
+    id,
     serviceId,
     queueStatus: QueueStatus.QUEUED,
     priority: QueuePriority.medium,
@@ -326,6 +333,7 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   return {
     item: queueItem,
     queuePosition,
+    memorableId,
   };
 }
 
@@ -448,4 +456,63 @@ export async function getQueuedItems({
   );
 
   return result.Items?.map((item) => QueueItem.fromItem(item)) ?? [];
+}
+
+// Pool ids '[A-z]-[0-9]{3}' (e.g. A-001...Z-999)
+// Rotate pool ids every 1000 ids
+// Divide clients into groups. Each group has a pool id
+
+export async function createMemorableId(
+  serviceId: string,
+  queueId: string
+): Promise<{
+  memorableId: string;
+}> {
+  const prefixPoolIds = "PI#";
+  const serviceItem = await ddbDocClient.send(
+    new GetCommand({
+      TableName,
+      Key: {
+        PK: ServiceItem.prefixService,
+        SK: ServiceItem.prefixService + serviceId,
+      },
+    })
+  );
+  const serviceName = serviceItem.Item?.name;
+  const firstLetterServiceName = serviceName[0];
+  const poolName = "FirstPool";
+  const res = await ddbDocClient.send(
+    new UpdateCommand({
+      TableName,
+      Key: {
+        PK: prefixPoolIds + poolName,
+        SK: firstLetterServiceName,
+      },
+      UpdateExpression: "ADD #counter :increment",
+      ExpressionAttributeNames: {
+        "#counter": "counter",
+      },
+      ExpressionAttributeValues: {
+        ":increment": 1,
+      },
+      ReturnValues: "ALL_NEW",
+    })
+  );
+
+  const counter = res.Attributes?.counter;
+
+  const memorableId =
+    firstLetterServiceName + "-" + counter.toString().padStart(3, "0");
+  await ddbDocClient.send(
+    new PutCommand({
+      TableName,
+      Item: {
+        PK: prefixPoolIds + poolName,
+        SK: memorableId,
+        id: QueueItem.prefix + queueId,
+      },
+    })
+  );
+
+  return { memorableId };
 }
