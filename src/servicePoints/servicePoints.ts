@@ -28,6 +28,7 @@ export type IServicePoint = {
   description: string;
   servicePointStatus: ServicePointStatus;
   currentItem?: string;
+  servicePointNumber: string;
 };
 
 export class ServicePointItem extends Item {
@@ -38,6 +39,7 @@ export class ServicePointItem extends Item {
   public description: string;
   public servicePointStatus: ServicePointStatus;
   public currentQueueItem?: string;
+  public servicePointNumber: string;
   constructor(servicePoint: Partial<IServicePoint>) {
     super();
     this.id = servicePoint.id || ulid();
@@ -47,6 +49,7 @@ export class ServicePointItem extends Item {
     this.servicePointStatus =
       servicePoint.servicePointStatus || ServicePointStatus.CLOSED;
     this.currentQueueItem = servicePoint.currentItem;
+    this.servicePointNumber = servicePoint.servicePointNumber || "";
   }
 
   get PK(): string {
@@ -65,6 +68,7 @@ export class ServicePointItem extends Item {
       description: item.description as string,
       servicePointStatus: item.servicePointStatus as ServicePointStatus,
       currentItem: item.currentItem as string,
+      servicePointNumber: item.servicePointNumber as string,
     });
   }
 
@@ -76,6 +80,7 @@ export class ServicePointItem extends Item {
       description: this.description,
       servicePointStatus: this.servicePointStatus,
       currentItem: this.currentQueueItem,
+      servicePointNumber: this.servicePointNumber,
     };
   }
 
@@ -101,15 +106,20 @@ export const createServicePointHandler: APIGatewayProxyHandler = async (
     };
   }
   try {
-    const { servicePointId, serviceIds, name, description } = JSON.parse(
-      event.body
-    );
+    const {
+      servicePointId,
+      servicePointNumber,
+      serviceIds,
+      name,
+      description,
+    } = JSON.parse(event.body);
     const res = await createServicePoint({
       id: servicePointId,
       serviceIds,
       name,
       description,
       servicePointStatus: ServicePointStatus.CLOSED,
+      servicePointNumber,
     });
     return {
       statusCode: 201,
@@ -187,12 +197,14 @@ export const updateServicePointHandler: APIGatewayProxyHandler = async (
         body: "Bad Request",
       };
     }
-    const { serviceIds, name, description, status } = JSON.parse(event.body);
+    const { serviceIds, servicePointNumber, name, description, status } =
+      JSON.parse(event.body);
     const res = await updateServicePoint({
       id: servicePointId,
       serviceIds,
       name,
       description,
+      servicePointNumber,
     });
     return {
       statusCode: 200,
@@ -305,6 +317,7 @@ async function createServicePoint(
     name: servicePointItem.name,
     description: servicePointItem.description,
     servicePointStatus: servicePointItem.servicePointStatus,
+    servicePointNumber: servicePointItem.servicePointNumber,
   };
 }
 

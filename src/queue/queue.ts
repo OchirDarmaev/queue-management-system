@@ -14,6 +14,7 @@ import { Item } from "../baseItem";
 import { ServiceItem } from "../services/services";
 import {
   ServicePointItem,
+  ServicePointStatus,
   getServicePoints,
 } from "../servicePoints/servicePoints";
 
@@ -140,29 +141,28 @@ export const getQueueItemHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
-  throw new Error("Not implemented");
-  // try {
-  //   const queueId = event.pathParameters?.queueId;
-  //   if (!queueId) {
-  //     return {
-  //       statusCode: 400,
-  //       body: "Bad Request",
-  //     };
-  //   }
-  //   const item = await getQueueItem({
-  //     queueId,
-  //   });
-  //   return {
-  //     statusCode: 200,
-  //     body: JSON.stringify(item),
-  //   };
-  // } catch (error) {
-  //   console.error(error);
-  //   return {
-  //     statusCode: 500,
-  //     body: "Internal Server Error",
-  //   };
-  // }
+  try {
+    const queueId = event.pathParameters?.queueId;
+    if (!queueId) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
+    const item = await getQueueItem({
+      queueId,
+    });
+    return {
+      statusCode: 200,
+      body: JSON.stringify(item),
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      statusCode: 500,
+      body: "Internal Server Error",
+    };
+  }
 };
 
 export const getQueueItemsHandler: APIGatewayProxyHandler = async (
@@ -422,9 +422,16 @@ export async function getItemsByStatus({
     )
   ).flat();
 
-  const serviceItemInProgress = servicePoints.filter((x) => x.currentQueueItem);
+  const servicePointIsInProgress = servicePoints.filter(
+    (x) =>
+      x.servicePointStatus === ServicePointStatus.IN_SERVICE ||
+      x.servicePointStatus === ServicePointStatus.WAITING
+  );
 
-  const keys = serviceItemInProgress.map((x) => x.currentQueueItem);
+  const keys = servicePointIsInProgress.map((servicePoint) =>
+    QueueItem.buildKey(servicePoint.currentQueueItem!)
+  );
+
   if (keys.length === 0) {
     return {
       itemsInQueue: itemsInQueue,
@@ -443,14 +450,14 @@ export async function getItemsByStatus({
 
   const itemsInProgress =
     Responses?.[TableName]?.map((x) => QueueItem.fromItem(x)) ?? [];
-  // const
-  // const servicePointByQueueId = Object.fromEntries(
-  //   serviceItemInProgress.map((x) => [x.currentQueueItem?.SK, x]
-  // )
+  const itemById = Object.fromEntries(itemsInProgress.map((x) => [x.id, x]));
 
   return {
     itemsInQueue: itemsInQueue,
-    itemsInProgress: [],
+    itemsInProgress: servicePointIsInProgress.map((servicePoint) => ({
+      servicePointNumber: servicePoint.servicePointNumber,
+      queueItem: itemById[servicePoint.currentQueueItem!],
+    })),
   };
 }
 
