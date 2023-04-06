@@ -388,39 +388,54 @@ async function updateQueueItem({
 
 async function getQueuedInfo() {
   const servicePoints = await getServicePoints();
-  return await getItemsByStatus({
+  return await getBoardStatus({
     servicePoints,
 
     limit: 10,
   });
 }
 
-export async function getItemsByStatus({
+export async function getItemsByStatus1({
   servicePoints,
+  queueStatus,
   limit,
 }: {
   servicePoints: ServicePointItem[];
+  queueStatus: QueueStatus;
   limit: number;
-}): Promise<{
-  itemsInQueue: QueueItem[];
-  itemsInProgress: {
-    servicePointNumber: string;
-    queueItem: QueueItem;
-  }[];
-}> {
+}): Promise<QueueItem[]> {
   const serviceIds = [
     ...new Set(
       servicePoints.flatMap((servicePoint) => servicePoint.serviceIds)
     ),
   ];
 
-  const itemsInQueue = (
+  return (
     await Promise.all(
       serviceIds.map((serviceId) =>
-        getQueuedItems({ serviceId, limit, queueStatus: QueueStatus.QUEUED })
+        getQueuedItems({ serviceId, limit, queueStatus })
       )
     )
   ).flat();
+}
+
+export async function getBoardStatus({
+  servicePoints,
+  limit,
+}: {
+  servicePoints: ServicePointItem[];
+  limit: number;
+}): Promise<{
+  items: {
+    servicePointNumber: string;
+    item: QueueItem;
+  }[];
+}> {
+  const itemsInQueue = await getItemsByStatus1({
+    servicePoints,
+    limit,
+    queueStatus: QueueStatus.QUEUED,
+  });
 
   const servicePointIsInProgress = servicePoints.filter(
     (x) =>
@@ -434,8 +449,10 @@ export async function getItemsByStatus({
 
   if (keys.length === 0) {
     return {
-      itemsInQueue: itemsInQueue,
-      itemsInProgress: [],
+      items: itemsInQueue.map((item) => ({
+        servicePointNumber: "",
+        item,
+      })),
     };
   }
   const { Responses } = await ddbDocClient.send(
@@ -453,11 +470,16 @@ export async function getItemsByStatus({
   const itemById = Object.fromEntries(itemsInProgress.map((x) => [x.id, x]));
 
   return {
-    itemsInQueue: itemsInQueue,
-    itemsInProgress: servicePointIsInProgress.map((servicePoint) => ({
-      servicePointNumber: servicePoint.servicePointNumber,
-      queueItem: itemById[servicePoint.currentQueueItem!],
-    })),
+    items: [
+      ...itemsInQueue.map((item) => ({
+        servicePointNumber: "",
+        item,
+      })),
+      ...servicePointIsInProgress.map((servicePoint) => ({
+        servicePointNumber: servicePoint.servicePointNumber,
+        item: itemById[servicePoint.currentQueueItem!],
+      })),
+    ],
   };
 }
 

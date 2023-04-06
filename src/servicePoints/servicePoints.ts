@@ -11,13 +11,15 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { TableName } from "../db";
-import { getItemsByStatus, QueueItem, QueueStatus } from "../queue/queue";
+import { getBoardStatus, getItemsByStatus1, QueueItem, QueueStatus } from "../queue/queue";
 import { Item } from "../baseItem";
 import { ServiceItem } from "../services/services";
 
 export enum ServicePointStatus {
   WAITING = "waiting",
   IN_SERVICE = "in-service",
+  SERVED = "served",
+  SKIPPED = "skipped",
   CLOSED = "closed",
 }
 
@@ -410,17 +412,19 @@ async function updateServicePointStatus({
   id,
   servicePointStatus: newServicePointStatus,
 }: Pick<IServicePoint, "id" | "servicePointStatus">) {
-  const result = await ddbDocClient.send(
-    new GetCommand({
-      TableName,
-      Key: new ServicePointItem({ id }).keys(),
-    })
-  );
-  if (!result.Item) {
-    throw new Error("Service point not found");
-  }
-  const servicePoint = ServicePointItem.fromItem(result.Item);
-
+  const getServicePoint = async (id: string) => {
+    const result = await ddbDocClient.send(
+      new GetCommand({
+        TableName,
+        Key: new ServicePointItem({ id }).keys(),
+      })
+    );
+    if (!result.Item) {
+      throw new Error("Service point not found");
+    }
+    return ServicePointItem.fromItem(result.Item);
+  };
+  const servicePoint = await getServicePoint(id);
   if (servicePoint.servicePointStatus === newServicePointStatus) {
     return;
   }
@@ -461,7 +465,8 @@ async function updateServicePointStatus({
 
         case ServicePointStatus.WAITING:
           await markAsServed(servicePoint);
-          await startWaitingQueue(servicePoint);
+          const servicePoint2 = await getServicePoint(id);
+          await startWaitingQueue(servicePoint2);
           return;
         default:
           throw new Error("Invalid status");
@@ -472,11 +477,12 @@ async function updateServicePointStatus({
 
 async function startWaitingQueue(servicePoint: ServicePointItem) {
   if (!servicePoint.currentQueueItem) {
-    const itemsByStatus = await getItemsByStatus({
+    const items = await getItemsByStatus1({
       servicePoints: [servicePoint],
       limit: 1,
+      queueStatus: QueueStatus.QUEUED,
     });
-    const queueItem = itemsByStatus.itemsInQueue?.[0];
+    const queueItem = items[0];
     if (!queueItem) {
       throw new Error("No item in queue");
     }
@@ -519,7 +525,7 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
 
 async function putItemBackToQueue(servicePoint: ServicePointItem) {
   if (!servicePoint.currentQueueItem) {
-    throw new Error("Queue item not defined");
+    return;
   }
   const res = await ddbDocClient.send(
     new GetCommand({
@@ -656,9 +662,11 @@ async function markAsServed(servicePoint: ServicePointItem) {
           Update: {
             TableName: TableName,
             Key: servicePoint.keys(),
-            UpdateExpression: "SET currentItem = :currentItem",
+            UpdateExpression:
+              "SET currentItem = :currentItem, servicePointStatus = :servicePointStatus ",
             ExpressionAttributeValues: {
               ":currentItem": "",
+              ":servicePointStatus": ServicePointStatus.SERVED,
             },
             ConditionExpression:
               "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentItem)",
