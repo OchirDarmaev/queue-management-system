@@ -445,6 +445,9 @@ export async function notifyNewItem(serviceId: string) {
 
   const servicePointIds = result?.Items?.map((item) => item.id) || [];
 
+
+  // todo consider workload balancing between service points
+  // now most of the time, the first service point will be selected
   for (const servicePointId of servicePointIds) {
     await updateServicePointStatus({
       id: servicePointId,
