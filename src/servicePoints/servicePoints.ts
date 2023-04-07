@@ -501,7 +501,7 @@ async function updateServicePointStatus({
 
         case ServicePointStatus.WAITING:
           await markAsServed(servicePoint);
-          const servicePoint2 = await getServicePoint(id);
+          const servicePoint2 = await getServicePoint2(id);
           await startWaitingQueue(servicePoint2);
           return;
         case ServicePointStatus.IN_SERVICE:
