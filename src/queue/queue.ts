@@ -210,10 +210,15 @@ export const updateQueueItemHandler: APIGatewayProxyHandler = async (
         body: "Bad Request",
       };
     }
-    const { queueStatus, priority } = JSON.parse(event.body);
+    const { priority } = JSON.parse(event.body);
+    if (!priority) {
+      return {
+        statusCode: 400,
+        body: "Bad Request",
+      };
+    }
     const res = await updateQueueItem({
       queueId,
-      queueStatus,
       priority,
     });
     return {
@@ -278,9 +283,10 @@ async function getQueueItems({
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
-      KeyConditionExpression: "PK = :pk",
+      IndexName: "GSI1",
+      KeyConditionExpression: "GSI1PK = :gsi1pk",
       ExpressionAttributeValues: {
-        ":pk": `${QueueItem.prefix}${ServiceItem.prefixService}${serviceId}`,
+        ":gsi1pk": `${QueueItem.prefix}${ServiceItem.prefixService}${serviceId}`,
       },
       ScanIndexForward: true,
     })
@@ -376,14 +382,25 @@ async function getQueuePosition(queueItem: QueueItem): Promise<number> {
 async function updateQueueItem({
   queueId,
   priority,
-  date,
 }: {
   queueId: string;
-  queueStatus?: QueueStatus;
-  priority?: QueuePriority;
-  date?: string;
+  priority: QueuePriority;
 }) {
-  throw new Error("Not implemented");
+  const queueItem = await getQueueItem({ queueId });
+
+  queueItem.item.priority = priority;
+
+  await ddbDocClient.send(
+    new UpdateCommand({
+      TableName,
+      Key: QueueItem.buildKey(queueId),
+      UpdateExpression: "SET priority = :priority, GSI1SK = :gsi1sk",
+      ExpressionAttributeValues: {
+        ":priority": priority,
+        ":gsi1sk": queueItem.item.GSI1SK,
+      },
+    })
+  );
 }
 
 async function getQueuedInfo() {
@@ -471,13 +488,15 @@ export async function getBoardStatus({
 
   return {
     items: [
+      ...servicePointIsInProgress
+        .map((servicePoint) => ({
+          servicePointNumber: servicePoint.servicePointNumber,
+          item: itemById[servicePoint.currentQueueItem!],
+        }))
+        .sort((a, b) => a.item.GSI1SK.localeCompare(b.item.GSI1SK) * -1),
       ...itemsInQueue.map((item) => ({
         servicePointNumber: "",
         item,
-      })),
-      ...servicePointIsInProgress.map((servicePoint) => ({
-        servicePointNumber: servicePoint.servicePointNumber,
-        item: itemById[servicePoint.currentQueueItem!],
       })),
     ],
   };

@@ -11,7 +11,12 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { ulid } from "ulid";
 import { TableName } from "../db";
-import { getBoardStatus, getItemsByStatus1, QueueItem, QueueStatus } from "../queue/queue";
+import {
+  getBoardStatus,
+  getItemsByStatus1,
+  QueueItem,
+  QueueStatus,
+} from "../queue/queue";
 import { Item } from "../baseItem";
 import { ServiceItem } from "../services/services";
 
@@ -487,6 +492,7 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
       throw new Error("No item in queue");
     }
     queueItem.queueStatus = QueueStatus.PENDING;
+    queueItem.date = new Date().toISOString();
 
     await ddbDocClient.send(
       new TransactWriteCommand({
@@ -496,9 +502,15 @@ async function startWaitingQueue(servicePoint: ServicePointItem) {
               TableName: TableName,
               Key: queueItem.keys(),
               UpdateExpression:
-                "SET queueStatus = :queueStatus, GSI1SK = :GSI1SK",
+                "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
+              ExpressionAttributeNames: {
+                "#queueStatus": "queueStatus",
+                "#date": "date",
+                "#GSI1SK": "GSI1SK",
+              },
               ExpressionAttributeValues: {
                 ":queueStatus": queueItem.queueStatus,
+                ":date": queueItem.date,
                 ":GSI1SK": queueItem.GSI1SK,
               },
             },
@@ -540,6 +552,7 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
   const queueItem = QueueItem.fromItem(res.Item);
 
   queueItem.queueStatus = QueueStatus.QUEUED;
+  queueItem.date = new Date().toISOString();
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -549,9 +562,15 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
             TableName: TableName,
             Key: queueItem.keys(),
             UpdateExpression:
-              "SET queueStatus = :queueStatus, GSI1SK = :GSI1SK",
+              "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
+            ExpressionAttributeNames: {
+              "#queueStatus": "queueStatus",
+              "#date": "date",
+              "#GSI1SK": "GSI1SK",
+            },
             ExpressionAttributeValues: {
               ":queueStatus": queueItem.queueStatus,
+              ":date": queueItem.date,
               ":GSI1SK": queueItem.GSI1SK,
             },
           },
@@ -589,6 +608,7 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
   }
   const queueItem = QueueItem.fromItem(res.Item);
   queueItem.queueStatus = QueueStatus.IN_SERVICE;
+  queueItem.date = new Date().toISOString();
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -598,9 +618,15 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
             TableName: TableName,
             Key: queueItem.keys(),
             UpdateExpression:
-              "SET queueStatus = :queueStatus, GSI1SK = :GSI1SK",
+              "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
+            ExpressionAttributeNames: {
+              "#queueStatus": "queueStatus",
+              "#date": "date",
+              "#GSI1SK": "GSI1SK",
+            },
             ExpressionAttributeValues: {
               ":queueStatus": queueItem.queueStatus,
+              ":date": queueItem.date,
               ":GSI1SK": queueItem.GSI1SK,
             },
           },
@@ -640,6 +666,7 @@ async function markAsServed(servicePoint: ServicePointItem) {
   }
   const queueItem = QueueItem.fromItem(res.Item);
   queueItem.queueStatus = QueueStatus.SERVED;
+  queueItem.date = new Date().toISOString();
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -649,9 +676,15 @@ async function markAsServed(servicePoint: ServicePointItem) {
             TableName: TableName,
             Key: queueItem.keys(),
             UpdateExpression:
-              "SET queueStatus = :queueStatus, GSI1SK = :GSI1SK",
+              "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
+            ExpressionAttributeNames: {
+              "#queueStatus": "queueStatus",
+              "#date": "date",
+              "#GSI1SK": "GSI1SK",
+            },
             ExpressionAttributeValues: {
               ":queueStatus": queueItem.queueStatus,
+              ":date": queueItem.date,
               ":GSI1SK": queueItem.GSI1SK,
             },
             ConditionExpression:
