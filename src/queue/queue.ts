@@ -16,6 +16,7 @@ import {
   ServicePointItem,
   ServicePointStatus,
   getServicePoints,
+  notifyNewItem,
 } from "../servicePoints/servicePoints";
 
 const prefixQueue = "Q#";
@@ -348,6 +349,7 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   );
 
   const queuePosition = await getQueuePosition(queueItem);
+  await notifyNewItem(serviceId);
   return {
     item: queueItem,
     queuePosition,
