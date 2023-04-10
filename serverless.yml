@@ -24,6 +24,14 @@ provider:
           Resource: "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ONE_TABLE}"
 
 functions:
+  test1:
+    handler: src/handler.handler
+    events:
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt: [OneTable, StreamArn]
+
   #ServicePoint
   createServicePoint:
     handler: src/servicePoints/servicePoints.createServicePointHandler
@@ -180,3 +188,5 @@ resources:
               ProjectionType: "ALL"
         BillingMode: PAY_PER_REQUEST
         TableName: ${self:provider.environment.ONE_TABLE}
+        StreamSpecification:
+          StreamViewType: "NEW_AND_OLD_IMAGES"
