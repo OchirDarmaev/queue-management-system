@@ -7,110 +7,23 @@ import {
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { APIGatewayProxyHandler } from "aws-lambda";
-import { ddbDocClient } from "../dynamoDB";
-import { TableName } from "../db";
+import { ddbDocClient } from "../ddb-doc-client";
+import { TableName } from "../table-name";
 import { ulid } from "ulid";
-import { Item } from "../baseItem";
-import { ServiceItem } from "../services/services";
+import { ServiceItem } from "../services/ServiceItem";
 import {
-  ServicePointItem,
-  ServicePointStatus,
   getServicePoints,
   notifyNewItem,
 } from "../servicePoints/servicePoints";
+import { ServicePointItem } from "../servicePoints/ServicePointItem";
+import { ServicePointStatus } from "../servicePoints/ServicePointStatus";
+import { QueuePriority } from "./QueuePriority";
+import { QueueStatus } from "./QueueStatus";
+import { IQueueItem } from "./IQueueItem";
+import { QueueItem } from "./QueueItem";
 
-const prefixQueue = "Q#";
-const prefixQueueStatus = "Q_STATUS#";
-
-export enum QueueStatus {
-  QUEUED = "queued",
-  PENDING = "pending",
-  IN_SERVICE = "in-service",
-  SERVED = "served",
-  SKIPPED = "skipped",
-}
-
-export enum QueuePriority {
-  high = "1",
-  medium = "5",
-}
-
-export interface IQueueItem {
-  id: string;
-  serviceId: string;
-  queueStatus: QueueStatus;
-  priority: QueuePriority;
-  date: string;
-  memorableId: string;
-}
-
-export class QueueItem extends Item {
-  static prefix = prefixQueue;
-
-  public id: string;
-  public serviceId: string;
-  public queueStatus: QueueStatus;
-  public priority: QueuePriority;
-  public date: string;
-  public memorableId: string;
-  constructor(queueItem: IQueueItem) {
-    super();
-    this.id = queueItem.id;
-    this.serviceId = queueItem.serviceId;
-    this.queueStatus = queueItem.queueStatus;
-    this.priority = queueItem.priority;
-    this.date = queueItem.date;
-    this.memorableId = queueItem.memorableId;
-  }
-  get PK(): string {
-    return QueueItem.buildKey(this.id).PK;
-  }
-  get SK(): string {
-    return QueueItem.buildKey(this.id).SK;
-  }
-
-  get GSI1PK(): string {
-    return QueueItem.prefix + ServiceItem.prefixService + this.serviceId;
-  }
-
-  get GSI1SK(): string {
-    return `${prefixQueueStatus}${this.queueStatus}Q_PRIORITY#${this.priority}#Q_DATE${this.date}`;
-  }
-
-  toItem(): Record<string, unknown> {
-    return {
-      ...this.keys(),
-      serviceId: this.serviceId,
-      queueStatus: this.queueStatus,
-      priority: this.priority,
-      date: this.date,
-      memorableId: this.memorableId,
-      GSI1PK: this.GSI1PK,
-      GSI1SK: this.GSI1SK,
-    };
-  }
-
-  static fromItem(item: Record<string, unknown>): QueueItem {
-    return new QueueItem({
-      id: (item.SK as string).replace(QueueItem.prefix, ""),
-      serviceId: item.serviceId as string,
-      queueStatus: item.queueStatus as QueueStatus,
-      priority: item.priority as QueuePriority,
-      date: item.date as string,
-      memorableId: item.memorableId as string,
-    });
-  }
-
-  static buildKey(queueId: string): {
-    PK: string;
-    SK: string;
-  } {
-    return {
-      PK: QueueItem.prefix,
-      SK: QueueItem.prefix + queueId,
-    };
-  }
-}
+export const prefixQueue = "Q#";
+export const prefixQueueStatus = "Q_STATUS#";
 
 export const createQueueItemHandler: APIGatewayProxyHandler = async (
   event,

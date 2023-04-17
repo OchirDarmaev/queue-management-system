@@ -1,5 +1,5 @@
-import { APIGatewayProxyHandler } from "aws-lambda";
-import { ddbDocClient } from "../dynamoDB";
+import { APIGatewayProxyHandler, DynamoDBStreamHandler } from "aws-lambda";
+import { ddbDocClient } from "../ddb-doc-client";
 import {
   BatchGetCommand,
   DeleteCommand,
@@ -9,98 +9,14 @@ import {
   TransactWriteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { ulid } from "ulid";
-import { TableName } from "../db";
-import {
-  getBoardStatus,
-  getItemsByStatus1,
-  QueueItem,
-  QueueStatus,
-} from "../queue/queue";
-import { Item } from "../baseItem";
-import { ServiceItem } from "../services/services";
-
-export enum ServicePointStatus {
-  WAITING = "waiting",
-  IN_SERVICE = "in-service",
-  SERVED = "served",
-  SKIPPED = "skipped",
-  CLOSED = "closed",
-}
-
-export type IServicePoint = {
-  id: string;
-  serviceIds: string[];
-  name: string;
-  description: string;
-  servicePointStatus: ServicePointStatus;
-  currentItem?: string;
-  servicePointNumber: string;
-};
-
-export class ServicePointItem extends Item {
-  static prefixServicePoint = "SP#";
-  public id: string;
-  public serviceIds: string[];
-  public name: string;
-  public description: string;
-  public servicePointStatus: ServicePointStatus;
-  public currentQueueItem?: string;
-  public servicePointNumber: string;
-  constructor(servicePoint: Partial<IServicePoint>) {
-    super();
-    this.id = servicePoint.id || ulid();
-    this.serviceIds = servicePoint.serviceIds || [];
-    this.name = servicePoint.name || "";
-    this.description = servicePoint.description || "";
-    this.servicePointStatus =
-      servicePoint.servicePointStatus || ServicePointStatus.CLOSED;
-    this.currentQueueItem = servicePoint.currentItem;
-    this.servicePointNumber = servicePoint.servicePointNumber || "";
-  }
-
-  get PK(): string {
-    return ServicePointItem.prefixServicePoint;
-  }
-
-  get SK(): string {
-    return ServicePointItem.prefixServicePoint + this.id;
-  }
-
-  static fromItem(item: Record<string, unknown>): ServicePointItem {
-    return new ServicePointItem({
-      id: (item.SK as string).replace(ServicePointItem.prefixServicePoint, ""),
-      serviceIds: item.serviceIds as string[],
-      name: item.name as string,
-      description: item.description as string,
-      servicePointStatus: item.servicePointStatus as ServicePointStatus,
-      currentItem: item.currentItem as string,
-      servicePointNumber: item.servicePointNumber as string,
-    });
-  }
-
-  toItem(): Record<string, unknown> {
-    return {
-      ...this.keys(),
-      serviceIds: this.serviceIds,
-      name: this.name,
-      description: this.description,
-      servicePointStatus: this.servicePointStatus,
-      currentItem: this.currentQueueItem,
-      servicePointNumber: this.servicePointNumber,
-    };
-  }
-
-  static buildKey(queueId: string): {
-    PK: string;
-    SK: string;
-  } {
-    return {
-      PK: ServicePointItem.prefixServicePoint,
-      SK: ServicePointItem.prefixServicePoint + queueId,
-    };
-  }
-}
+import { TableName } from "../table-name";
+import { getBoardStatus, getItemsByStatus1 } from "../queue/queue";
+import { QueueItem } from "../queue/QueueItem";
+import { QueueStatus } from "../queue/QueueStatus";
+import { ServiceItem } from "../services/ServiceItem";
+import { ServicePointStatus } from "./ServicePointStatus";
+import { IServicePoint } from "./IServicePoint";
+import { ServicePointItem } from "./ServicePointItem";
 
 export const createServicePointHandler: APIGatewayProxyHandler = async (
   event,
@@ -289,6 +205,27 @@ export const updateServicePointStatusHandler: APIGatewayProxyHandler = async (
   }
 };
 
+// dynamodb stream handler
+export const servicePointStreamHandler: DynamoDBStreamHandler = async (
+  event,
+  context
+) => {
+  console.log("event", event);
+  const records = event.Records;
+  if (!records) {
+    return;
+  }
+  for (const record of records) {
+    if (record.eventName === "INSERT") {
+      const newImage = record.dynamodb?.NewImage;
+      if (!newImage) {
+        continue;
+      }
+      // todo check if it new queue item
+    }
+  }
+};
+
 export async function getServicePoints() {
   const result = await ddbDocClient.send(
     new QueryCommand({
@@ -444,7 +381,6 @@ export async function notifyNewItem(serviceId: string) {
   );
 
   const servicePointIds = result?.Items?.map((item) => item.id) || [];
-
 
   // todo consider workload balancing between service points
   // now most of the time, the first service point will be selected
@@ -787,23 +723,3 @@ async function closeServicePoint(servicePoint: ServicePointItem) {
     })
   );
 }
-
-// export async function getServiceFromServicePointsIds(): Promise<string[]> {
-//   const result = await ddbDocClient.send(
-//     new QueryCommand({
-//       TableName,
-//       KeyConditionExpression: "PK = :pk",
-//       ExpressionAttributeValues: {
-//         ":pk": ServicePointItem.prefixServicePoint,
-//       },
-//       ProjectionExpression: "serviceIds",
-//       Select: "SPECIFIC_ATTRIBUTES",
-//     })
-//   );
-
-//   if (!result.Items?.length) {
-//     return [];
-//   }
-
-//   return [...new Set(result.Items.flatMap((item) => item.serviceIds))];
-// }
