@@ -10,7 +10,7 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { TableName } from "../table-name";
-import { getBoardStatus, getItemsByStatus1 } from "../queue/queue";
+import { getItemsByStatus1 } from "../queue/queue";
 import { QueueItem } from "../queue/QueueItem";
 import { QueueStatus } from "../queue/QueueStatus";
 import { ServiceItem } from "../services/ServiceItem";
@@ -120,8 +120,9 @@ export const updateServicePointHandler: APIGatewayProxyHandler = async (
         body: "Bad Request",
       };
     }
-    const { serviceIds, servicePointNumber, name, description, status } =
-      JSON.parse(event.body);
+    const { serviceIds, servicePointNumber, name, description } = JSON.parse(
+      event.body
+    );
     const res = await updateServicePoint({
       id: servicePointId,
       serviceIds,
@@ -215,13 +216,25 @@ export const servicePointStreamHandler: DynamoDBStreamHandler = async (
   if (!records) {
     return;
   }
+  console.log("records", JSON.stringify(records, null, 2));
+
   for (const record of records) {
     if (record.eventName === "INSERT") {
       const newImage = record.dynamodb?.NewImage;
       if (!newImage) {
         continue;
       }
-      // todo check if it new queue item
+      const prefix = newImage.PK?.S;
+      if (prefix !== QueueItem.prefix) {
+        console.log("prefix is not queue" + prefix);
+
+        continue;
+      }
+      const serviceId = newImage.serviceId?.S;
+      if (!serviceId) {
+        throw new Error("serviceId is not defined");
+      }
+      await notifyNewItem(serviceId);
     }
   }
 };
@@ -275,10 +288,10 @@ async function getServicePoint(
     })
   );
   if (!result.Item) {
-    throw new Error("Service point not found");
+    throw new Error("Service point not found 1");
   }
 
-  return new ServicePointItem(result.Item);
+  return ServicePointItem.fromItem(result.Item);
 }
 
 async function updateServicePoint(
@@ -333,7 +346,7 @@ async function updateServicePoint(
     })
   );
   if (!result.Attributes) {
-    throw new Error("Service point not found");
+    throw new Error("Service point not found 2");
   }
 
   return new ServicePointItem(result.Attributes);
@@ -357,30 +370,37 @@ const getServicePoint2 = async (id: string) => {
     })
   );
   if (!result.Item) {
-    throw new Error("Service point not found");
+    throw new Error("Service point not found 3");
   }
   return ServicePointItem.fromItem(result.Item);
 };
 
-export async function notifyNewItem(serviceId: string) {
+async function notifyNewItem(serviceId: string) {
   // get all service point that has this service and servicePointStatus = "waiting" and don't have any item in queue
   const result = await ddbDocClient.send(
     new QueryCommand({
       TableName,
       KeyConditionExpression: "PK = :pk and begins_with(SK, :sk)",
       FilterExpression:
-        "servicePointStatus = :servicePointStatus and contains(serviceIds, :serviceId)",
+        "servicePointStatus = :servicePointStatus and contains(serviceIds, :serviceId) and currentQueueItem = :empty",
       ExpressionAttributeValues: {
         ":pk": ServicePointItem.prefixServicePoint,
         ":sk": ServicePointItem.prefixServicePoint,
         ":servicePointStatus": ServicePointStatus.WAITING,
         ":serviceId": serviceId,
+        ":empty": "",
       },
-      ProjectionExpression: "id",
+      ProjectionExpression: "SK, servicePointStatus",
     })
   );
 
-  const servicePointIds = result?.Items?.map((item) => item.id) || [];
+  if (!result?.Items?.length) {
+    return;
+  }
+
+  const servicePointIds = result.Items.map(
+    (item) => ServicePointItem.fromItem(item).id
+  );
 
   // todo consider workload balancing between service points
   // now most of the time, the first service point will be selected
@@ -459,7 +479,6 @@ async function updateServicePointStatus({
         default:
           throw new Error("Invalid status");
       }
-      break;
   }
 }
 
@@ -520,9 +539,9 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
             TableName: TableName,
             Key: servicePoint.keys(),
             UpdateExpression:
-              "SET currentItem = :currentItem, servicePointStatus = :servicePointStatus",
+              "SET currentQueueItem = :currentQueueItem, servicePointStatus = :servicePointStatus",
             ExpressionAttributeValues: {
-              ":currentItem": queueItem.id,
+              ":currentQueueItem": queueItem.id,
               ":servicePointStatus": ServicePointStatus.WAITING,
             },
             ConditionExpression:
@@ -578,9 +597,9 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
           Update: {
             TableName: TableName,
             Key: servicePoint.keys(),
-            UpdateExpression: "SET currentItem = :currentItem",
+            UpdateExpression: "SET currentQueueItem = :currentQueueItem",
             ExpressionAttributeValues: {
-              ":currentItem": "",
+              ":currentQueueItem": "",
             },
             ConditionExpression:
               "attribute_exists(PK) and attribute_exists(SK)",
@@ -635,14 +654,14 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
             TableName: TableName,
             Key: servicePoint.keys(),
             UpdateExpression:
-              "SET servicePointStatus = :servicePointStatus, currentItem = :currentItem",
+              "SET servicePointStatus = :servicePointStatus, currentQueueItem = :currentQueueItem",
             ExpressionAttributeValues: {
               ":servicePointStatus": ServicePointStatus.IN_SERVICE,
-              ":currentItem": queueItem.id,
+              ":currentQueueItem": queueItem.id,
             },
 
             ConditionExpression:
-              "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentItem)",
+              "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentQueueItem)",
           },
         },
       ],
@@ -695,13 +714,13 @@ async function markAsServed(servicePoint: ServicePointItem) {
             TableName: TableName,
             Key: servicePoint.keys(),
             UpdateExpression:
-              "SET currentItem = :currentItem, servicePointStatus = :servicePointStatus ",
+              "SET currentQueueItem = :currentQueueItem, servicePointStatus = :servicePointStatus ",
             ExpressionAttributeValues: {
-              ":currentItem": "",
+              ":currentQueueItem": "",
               ":servicePointStatus": ServicePointStatus.SERVED,
             },
             ConditionExpression:
-              "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentItem)",
+              "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentQueueItem)",
           },
         },
       ],

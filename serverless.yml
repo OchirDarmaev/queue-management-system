@@ -8,6 +8,7 @@ provider:
   runtime: nodejs12.x
   stage: dev
   region: us-east-1
+  profile: "serverlessUser"
   environment:
     ONE_TABLE: ${self:service}-${sls:stage}
   iam:
@@ -27,14 +28,6 @@ provider:
             - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ONE_TABLE}/index/*"
 
 functions:
-  test1:
-    handler: src/handler.handler
-    events:
-      - stream:
-          type: dynamodb
-          arn:
-            Fn::GetAtt: [OneTable, StreamArn]
-
   #ServicePoint
   createServicePoint:
     handler: src/servicePoints/servicePoints.createServicePointHandler
@@ -66,6 +59,20 @@ functions:
       - http:
           method: PUT
           path: /servicePoints/{servicePointId}/status/{status}
+  updateServicePointStatusNewItem:
+    handler: src/servicePoints/servicePoints.servicePointStreamHandler
+    events:
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt: [OneTable, StreamArn]
+          filterPatterns:
+            - eventName: [INSERT]
+              dynamodb:
+                NewImage:
+                  PK:
+                    S: [Q#]
+
   removeServicePoint:
     handler: src/servicePoints/servicePoints.removeServicePointHandler
     events:
@@ -105,6 +112,7 @@ functions:
       - http:
           method: DELETE
           path: /services/{serviceId}
+  
   # queue
   createQueueItem:
     handler: src/queue/queue.createQueueItemHandler

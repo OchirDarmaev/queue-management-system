@@ -11,7 +11,7 @@ export class ServicePointItem extends Item {
   public name: string;
   public description: string;
   public servicePointStatus: ServicePointStatus;
-  public currentQueueItem?: string;
+  public currentQueueItem: string;
   public servicePointNumber: string;
   constructor(servicePoint: Partial<IServicePoint>) {
     super();
@@ -21,7 +21,7 @@ export class ServicePointItem extends Item {
     this.description = servicePoint.description || "";
     this.servicePointStatus =
       servicePoint.servicePointStatus || ServicePointStatus.CLOSED;
-    this.currentQueueItem = servicePoint.currentItem;
+    this.currentQueueItem = servicePoint.currentQueueItem || "";
     this.servicePointNumber = servicePoint.servicePointNumber || "";
   }
 
@@ -40,7 +40,7 @@ export class ServicePointItem extends Item {
       name: item.name as string,
       description: item.description as string,
       servicePointStatus: item.servicePointStatus as ServicePointStatus,
-      currentItem: item.currentItem as string,
+      currentQueueItem: item.currentQueueItem as string,
       servicePointNumber: item.servicePointNumber as string,
     });
   }
@@ -52,7 +52,7 @@ export class ServicePointItem extends Item {
       name: this.name,
       description: this.description,
       servicePointStatus: this.servicePointStatus,
-      currentItem: this.currentQueueItem,
+      currentQueueItem: this.currentQueueItem,
       servicePointNumber: this.servicePointNumber,
     };
   }

@@ -3,11 +3,10 @@ import { ServiceItem } from "../services/ServiceItem";
 import { QueuePriority } from "./QueuePriority";
 import { QueueStatus } from "./QueueStatus";
 import { IQueueItem } from "./IQueueItem";
-import { prefixQueue, prefixQueueStatus } from "./queue";
-
 
 export class QueueItem extends Item {
-  static prefix = prefixQueue;
+  static prefix = "Q#"
+  static prefixQueueStatus = "Q_STATUS#";
 
   public id: string;
   public serviceId: string;
@@ -25,10 +24,11 @@ export class QueueItem extends Item {
     this.memorableId = queueItem.memorableId;
   }
   get PK(): string {
-    return QueueItem.buildKey(this.id).PK;
+    return QueueItem.prefix;
   }
+
   get SK(): string {
-    return QueueItem.buildKey(this.id).SK;
+    return QueueItem.prefix + this.id;
   }
 
   get GSI1PK(): string {
@@ -36,7 +36,7 @@ export class QueueItem extends Item {
   }
 
   get GSI1SK(): string {
-    return `${prefixQueueStatus}${this.queueStatus}Q_PRIORITY#${this.priority}#Q_DATE${this.date}`;
+    return `${QueueItem.prefixQueueStatus}${this.queueStatus}Q_PRIORITY#${this.priority}#Q_DATE${this.date}`;
   }
 
   toItem(): Record<string, unknown> {

@@ -11,19 +11,13 @@ import { ddbDocClient } from "../ddb-doc-client";
 import { TableName } from "../table-name";
 import { ulid } from "ulid";
 import { ServiceItem } from "../services/ServiceItem";
-import {
-  getServicePoints,
-  notifyNewItem,
-} from "../servicePoints/servicePoints";
+import { getServicePoints } from "../servicePoints/servicePoints";
 import { ServicePointItem } from "../servicePoints/ServicePointItem";
 import { ServicePointStatus } from "../servicePoints/ServicePointStatus";
 import { QueuePriority } from "./QueuePriority";
 import { QueueStatus } from "./QueueStatus";
 import { IQueueItem } from "./IQueueItem";
 import { QueueItem } from "./QueueItem";
-
-export const prefixQueue = "Q#";
-export const prefixQueueStatus = "Q_STATUS#";
 
 export const createQueueItemHandler: APIGatewayProxyHandler = async (
   event,
@@ -167,7 +161,7 @@ export const getQueueStatusHandler: APIGatewayProxyHandler = async (
   }
 };
 
-export async function getQueueItem({ queueId }: { queueId: string }): Promise<{
+async function getQueueItem({ queueId }: { queueId: string }): Promise<{
   item: QueueItem;
   queuePosition: number;
 }> {
@@ -237,6 +231,8 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   });
 
   const serviceKey = ServiceItem.buildKey(serviceId);
+  const i = queueItem.toItem();
+  console.log(JSON.stringify(i));
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -262,7 +258,7 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
   );
 
   const queuePosition = await getQueuePosition(queueItem);
-  await notifyNewItem(serviceId);
+
   return {
     item: queueItem,
     queuePosition,
@@ -270,7 +266,7 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
 }
 
 async function getQueuePosition(queueItem: QueueItem): Promise<number> {
-  if (!queueItem.GSI1SK.startsWith(prefixQueueStatus + QueueStatus.QUEUED)) {
+  if (!queueItem.GSI1SK.startsWith(QueueItem.prefix + QueueStatus.QUEUED)) {
     return -1;
   }
 
@@ -417,7 +413,7 @@ export async function getBoardStatus({
   };
 }
 
-export async function getQueuedItems({
+async function getQueuedItems({
   serviceId,
   limit,
   queueStatus,
@@ -434,7 +430,7 @@ export async function getQueuedItems({
         "GSI1PK = :gsi1pk AND begins_with(GSI1SK, :gsi1sk)",
       ExpressionAttributeValues: {
         ":gsi1pk": `${QueueItem.prefix}${ServiceItem.prefixService}${serviceId}`,
-        ":gsi1sk": prefixQueueStatus + queueStatus,
+        ":gsi1sk": QueueItem.prefixQueueStatus + queueStatus,
       },
       Limit: limit,
       ScanIndexForward: true,
@@ -448,7 +444,7 @@ export async function getQueuedItems({
  * Pool ids '[A-z]-[0-9]{3}' (e.g. A-001...Z-999)
  * */
 // todo Rotate pool ids every 1000 ids
-export async function createMemorableId(serviceId: string): Promise<string> {
+async function createMemorableId(serviceId: string): Promise<string> {
   const prefixPoolIds = "PI#";
   const serviceItem = await ddbDocClient.send(
     new GetCommand({

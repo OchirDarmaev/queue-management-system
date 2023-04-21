@@ -7,6 +7,6 @@ export type IServicePoint = {
   name: string;
   description: string;
   servicePointStatus: ServicePointStatus;
-  currentItem?: string;
+  currentQueueItem?: string;
   servicePointNumber: string;
 };
