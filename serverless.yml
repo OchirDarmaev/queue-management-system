@@ -11,6 +11,17 @@ provider:
   profile: "serverlessUser"
   environment:
     ONE_TABLE: ${self:service}-${sls:stage}
+    USER_POOL_NAME: ${self:service}-${sls:stage}-user-pool
+    USER_POOL_CLIENT_NAME: ${self:service}-${sls:stage}-user-pool-client
+    USER_POOL_DOMAIN: ${self:service}-${sls:stage}-user-pool-domain
+  httpApi:
+    authorizers:
+      myAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}"
+        audience:
+          - !Sub "${CognitoUserPoolClient}"
   iam:
     role:
       statements:
@@ -28,6 +39,23 @@ provider:
             - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ONE_TABLE}/index/*"
 
 functions:
+  #test
+  testProtected:
+    handler: src/test/test.handlerProtected
+    events:
+      - httpApi:
+          method: GET
+          path: /test/protected
+          authorizer:
+            name: myAuthorizer
+
+  testPublic:
+    handler: src/test/test.handlerPublic
+    events:
+      - http:
+          method: GET
+          path: /test/public
+
   #ServicePoint
   createServicePoint:
     handler: src/servicePoints/servicePoints.createServicePointHandler
@@ -201,3 +229,28 @@ resources:
         TableName: ${self:provider.environment.ONE_TABLE}
         StreamSpecification:
           StreamViewType: "NEW_AND_OLD_IMAGES"
+
+    CognitoUserPool:
+      Type: "AWS::Cognito::UserPool"
+      Properties:
+        UserPoolName: ${self:provider.environment.USER_POOL_NAME}
+        UsernameAttributes:
+          - "email"
+        AutoVerifiedAttributes:
+          - "email"
+    CognitoUserPoolClient:
+      Type: "AWS::Cognito::UserPoolClient"
+      Properties:
+        ClientName: ${self:provider.environment.USER_POOL_CLIENT_NAME}
+        UserPoolId:
+          Ref: "CognitoUserPool"
+        ExplicitAuthFlows:
+          - "ADMIN_NO_SRP_AUTH"
+          - "USER_PASSWORD_AUTH"
+        GenerateSecret: false
+    UserPoolDomain:
+      Type: "AWS::Cognito::UserPoolDomain"
+      Properties:
+        Domain: ${self:provider.environment.USER_POOL_DOMAIN}
+        UserPoolId:
+          Ref: "CognitoUserPool"
