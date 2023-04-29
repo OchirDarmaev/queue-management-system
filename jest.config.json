@@ -1,0 +1,23 @@
+{
+  "moduleFileExtensions": [
+    "js",
+    "json",
+    "ts"
+  ],
+  "testRegex": ".*\\.spec\\.ts$",
+  "transform": {
+    "^.+\\.(t|j)s$": "ts-jest"
+  },
+  "collectCoverageFrom": [
+    "**/*.(t|j)s"
+  ],
+  "coverageDirectory": "coverage",
+  "collectCoverage": false,
+  "coverageReporters": ["lcov"],
+  "testEnvironment": "node",
+  "moduleNameMapper": {
+    "^(test|src)/(.*)": "<rootDir>/$1/$2"
+    
+  },
+  "passWithNoTests": true
+}

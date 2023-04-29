@@ -18,11 +18,21 @@ import { QueuePriority } from "./QueuePriority";
 import { QueueStatus } from "./QueueStatus";
 import { IQueueItem } from "./IQueueItem";
 import { QueueItem } from "./QueueItem";
+import { check } from "../auth/check";
+import { EAction } from "../auth/enums/action.enum";
+import { ESubject } from "../auth/enums/subject.enum";
 
 export const createQueueItemHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  if (!check(event, EAction.Create, ESubject.QueueItem)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+
   try {
     const serviceId = event.pathParameters?.serviceId;
     if (!serviceId) {
@@ -49,6 +59,12 @@ export const getQueueItemHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  if (!check(event, EAction.Read, ESubject.QueueItem)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
   try {
     const queueId = event.pathParameters?.queueId;
     if (!queueId) {
@@ -77,6 +93,12 @@ export const getQueueItemsHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  if (!check(event, EAction.Read, ESubject.QueueItem)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
   try {
     const serviceId = event.pathParameters?.serviceId;
     if (!serviceId) {
@@ -103,6 +125,12 @@ export const updateQueueItemHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  if (!check(event, EAction.Update, ESubject.QueueItem)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
   try {
     const queueId = event.pathParameters?.queueId;
     if (!queueId) {
@@ -146,6 +174,13 @@ export const getQueueStatusHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  if (!check(event, EAction.Read, ESubject.QueueItem)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+  
   try {
     const res = await getQueuedInfo();
     return {

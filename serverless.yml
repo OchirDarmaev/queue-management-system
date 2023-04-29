@@ -34,10 +34,9 @@ provider:
             - dynamodb:UpdateItem
             - dynamodb:DeleteItem
             - dynamodb:ConditionCheckItem
-          Resource: 
+          Resource:
             - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ONE_TABLE}"
             - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ONE_TABLE}/index/*"
-
 functions:
   #test
   testProtected:
@@ -46,6 +45,14 @@ functions:
       - httpApi:
           method: GET
           path: /test/protected
+          authorizer:
+            name: myAuthorizer
+  testProtected2:
+    handler: src/test/test.handlerProtected
+    events:
+      - httpApi:
+          method: GET
+          path: /test/protected2
           authorizer:
             name: myAuthorizer
 
@@ -110,13 +117,13 @@ functions:
 
   #Service
   createService:
-    handler: src/services/services.handler
+    handler: src/services/services.createServiceHandler
     events:
       - http:
           method: POST
           path: /services
   getAllServices:
-    handler: src/services/services.handler
+    handler: src/services/services.getAllServicesHandler
     events:
       - http:
           method: GET
@@ -129,18 +136,18 @@ functions:
           method: GET
           path: /services/{serviceId}
   updateService:
-    handler: src/services/services.handler
+    handler: src/services/services.updateServiceHandler
     events:
       - http:
           method: PUT
           path: /services/{serviceId}
   deleteService:
-    handler: src/services/services.handler
+    handler: src/services/services.deleteServiceHandler
     events:
       - http:
           method: DELETE
           path: /services/{serviceId}
-  
+
   # queue
   createQueueItem:
     handler: src/queue/queue.createQueueItemHandler
@@ -254,3 +261,79 @@ resources:
         Domain: ${self:provider.environment.USER_POOL_DOMAIN}
         UserPoolId:
           Ref: "CognitoUserPool"
+
+    GroupAdmin:
+      Type: "AWS::Cognito::UserPoolGroup"
+      Properties:
+        GroupName: "admin"
+        Description: "Admin group for queue management system"
+        UserPoolId:
+          Ref: "CognitoUserPool"
+    GroupSpecialist:
+      Type: "AWS::Cognito::UserPoolGroup"
+      Properties:
+        GroupName: "specialist"
+        Description: "Specialist group for queue management system"
+        UserPoolId:
+          Ref: "CognitoUserPool"
+    GroupClient:
+      Type: "AWS::Cognito::UserPoolGroup"
+      Properties:
+        GroupName: "client"
+        Description: "Client group for queue management system"
+        UserPoolId:
+          Ref: "CognitoUserPool"
+
+  #       Precedence: 1
+  #       RoleArn:
+  #         Fn::GetAtt: [AdminRole, Arn]
+  #   AdminRole:
+  #     Type: "AWS::IAM::Role"
+  #     Properties:
+  #       RoleName: "queue-management-system-admin-role"
+  #       AssumeRolePolicyDocument:
+  #         Version: "2012-10-17"
+  #         Statement:
+  #           - Effect: "Allow"
+  #             Principal:
+  #               Federated: "cognito-identity.amazonaws.com"
+  #             Action:
+  #               - "sts:AssumeRoleWithWebIdentity"
+  #             Condition:
+  #               StringEquals:
+  #                 "cognito-identity.amazonaws.com:aud":
+  #                   Ref: "CognitoUserPool"
+  #               "ForAnyValue:StringLike":
+  #                 "cognito-identity.amazonaws.com:amr": "authenticated"
+  #   # Policies:
+  #   #   - PolicyName: "ServicePointManagementPolicy"
+  #   #     PolicyDocument:
+  #   #       Version: "2012-10-17"
+  #   #       Statement:
+  #   #         - Effect: "Allow"
+  #   #           Action:
+  #   #             - "execute-api:Invoke"
+  #   #           Resource:
+  #   #             Fn::Join:
+  #   #               - ""
+  #   #               - - "arn:aws:execute-api:"
+  #   #                 - !Ref AWS::Region
+  #   #                 - ":"
+  #   #                 - !Ref AWS::AccountId
+  #   #                 - ":"
+  #   #                 - !Ref HttpApi
+  #   #                 - "/*/*"
+
+  # # iam:
+  # #   role:
+  # #     statements:
+  # #       # Allow access to ServicePoint functions for admins only
+  # #       - Effect: Allow
+  # #         Action:
+  # #           - "execute-api:Invoke"
+  # #         Resource:
+  # #           - "execute-api:/prod/*/*/servicePoints"
+  # #         Condition:
+  # #           StringEquals:
+  # #             "cognito:groups":
+  # #               - "Admin"

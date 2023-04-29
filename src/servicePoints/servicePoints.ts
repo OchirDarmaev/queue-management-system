@@ -17,11 +17,22 @@ import { ServiceItem } from "../services/ServiceItem";
 import { ServicePointStatus } from "./ServicePointStatus";
 import { IServicePoint } from "./IServicePoint";
 import { ServicePointItem } from "./ServicePointItem";
+import { check } from "../auth/check";
+import { EAction } from "../auth/enums/action.enum";
+import { ESubject } from "../auth/enums/subject.enum";
 
 export const createServicePointHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  
+  if (!check(event, EAction.Create, ESubject.ServicePoint)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+
   if (!event.body) {
     return {
       statusCode: 400,
@@ -61,6 +72,13 @@ export const getServicePointHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  if (!check(event, EAction.Read, ESubject.ServicePoint)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+
   try {
     const id = event.pathParameters?.servicePointId;
     if (!id) {
@@ -87,6 +105,13 @@ export const getServicePointsHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+  if (!check(event, EAction.Read, ESubject.ServicePoint)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+
   try {
     const res = await getServicePoints();
     return {
@@ -106,6 +131,14 @@ export const updateServicePointHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+
+  if (!check(event, EAction.Update, ESubject.ServicePoint)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+
   try {
     const servicePointId = event.pathParameters?.servicePointId;
     if (!servicePointId) {
@@ -147,6 +180,14 @@ export const removeServicePointHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+
+  if (!check(event, EAction.Delete, ESubject.ServicePoint)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+
   try {
     const id = event.pathParameters?.servicePointId;
     if (!id) {
@@ -173,6 +214,14 @@ export const updateServicePointStatusHandler: APIGatewayProxyHandler = async (
   event,
   context
 ) => {
+
+  if (!check(event, EAction.UpdateStatus, ESubject.ServicePoint)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+
   try {
     const id = event.pathParameters?.servicePointId;
     if (!id) {
