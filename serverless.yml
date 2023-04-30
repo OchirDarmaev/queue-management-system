@@ -14,6 +14,7 @@ provider:
     USER_POOL_NAME: ${self:service}-${sls:stage}-user-pool
     USER_POOL_CLIENT_NAME: ${self:service}-${sls:stage}-user-pool-client
     USER_POOL_DOMAIN: ${self:service}-${sls:stage}-user-pool-domain
+    TOPIC_PREFIX: ${self:service}/${sls:stage}
   httpApi:
     authorizers:
       myAuthorizer:
@@ -37,6 +38,11 @@ provider:
           Resource:
             - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ONE_TABLE}"
             - "arn:aws:dynamodb:${opt:region, self:provider.region}:*:table/${self:provider.environment.ONE_TABLE}/index/*"
+        - Effect: Allow
+          Action:
+            - iot:Publish
+          Resource:
+            - "arn:aws:iot:${opt:region, self:provider.region}:*:topic/${self:service}/${sls:stage}/*"
 functions:
   #test
   testProtected:

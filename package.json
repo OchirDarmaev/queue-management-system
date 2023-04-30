@@ -9,6 +9,7 @@
   "license": "MIT",
   "dependencies": {
     "@aws-sdk/client-dynamodb": "^3.298.0",
+    "@aws-sdk/client-iot-data-plane": "^3.321.1",
     "@aws-sdk/lib-dynamodb": "^3.298.0",
     "@casl/ability": "^6.5.0",
     "casl": "^1.1.0",
