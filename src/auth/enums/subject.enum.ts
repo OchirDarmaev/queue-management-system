@@ -1,6 +1,6 @@
 export enum ESubject {
-  ServicePoint = "service-point",
   All = "all",
+  ServicePoint = "service-point",
   QueueItem = "QueueItem",
-  Services = "Services"
+  Services = "Services",
 }

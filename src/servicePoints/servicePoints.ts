@@ -1,4 +1,7 @@
-import { APIGatewayProxyHandler, DynamoDBStreamHandler } from "aws-lambda";
+import {
+  APIGatewayProxyHandlerV2WithJWTAuthorizer,
+  DynamoDBStreamHandler,
+} from "aws-lambda";
 import { ddbDocClient } from "../ddb-doc-client";
 import {
   BatchGetCommand,
@@ -21,90 +24,84 @@ import { check } from "../auth/check";
 import { EAction } from "../auth/enums/action.enum";
 import { ESubject } from "../auth/enums/subject.enum";
 
-export const createServicePointHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  
-  if (!check(event, EAction.Create, ESubject.ServicePoint)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
+export const createServicePointHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Create, ESubject.ServicePoint)) {
+      return {
+        statusCode: 403,
+        body: `Forbidden`,
+      };
+    }
 
-  if (!event.body) {
-    return {
-      statusCode: 400,
-      body: "Bad Request",
-    };
-  }
-  try {
-    const {
-      servicePointId,
-      servicePointNumber,
-      serviceIds,
-      name,
-      description,
-    } = JSON.parse(event.body);
-    const res = await createServicePoint({
-      id: servicePointId,
-      serviceIds,
-      name,
-      description,
-      servicePointStatus: ServicePointStatus.CLOSED,
-      servicePointNumber,
-    });
-    return {
-      statusCode: 201,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
-
-export const getServicePointHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Read, ESubject.ServicePoint)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-
-  try {
-    const id = event.pathParameters?.servicePointId;
-    if (!id) {
+    if (!event.body) {
       return {
         statusCode: 400,
         body: "Bad Request",
       };
     }
-    const res = await getServicePoint({ id });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
+    try {
+      const {
+        servicePointId,
+        servicePointNumber,
+        serviceIds,
+        name,
+        description,
+      } = JSON.parse(event.body);
+      const res = await createServicePoint({
+        id: servicePointId,
+        serviceIds,
+        name,
+        description,
+        servicePointStatus: ServicePointStatus.CLOSED,
+        servicePointNumber,
+      });
+      return {
+        statusCode: 201,
+        body: JSON.stringify(res),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
 
-export const getServicePointsHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
+export const getServicePointHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Read, ESubject.ServicePoint)) {
+      return {
+        statusCode: 403,
+        body: `Forbidden`,
+      };
+    }
+
+    try {
+      const id = event.pathParameters?.servicePointId;
+      if (!id) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const res = await getServicePoint({ id });
+      return {
+        statusCode: 200,
+        body: JSON.stringify(res),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
+
+export const getServicePointsHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer<
+  IServicePoint[]
+> = async (event, context) => {
   if (!check(event, EAction.Read, ESubject.ServicePoint)) {
     return {
       statusCode: 403,
@@ -114,10 +111,7 @@ export const getServicePointsHandler: APIGatewayProxyHandler = async (
 
   try {
     const res = await getServicePoints();
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
+    return res;
   } catch (error) {
     console.error(error);
     return {
@@ -127,133 +121,124 @@ export const getServicePointsHandler: APIGatewayProxyHandler = async (
   }
 };
 
-export const updateServicePointHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-
-  if (!check(event, EAction.Update, ESubject.ServicePoint)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-
-  try {
-    const servicePointId = event.pathParameters?.servicePointId;
-    if (!servicePointId) {
+export const updateServicePointHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Update, ESubject.ServicePoint)) {
       return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const { serviceIds, servicePointNumber, name, description } = JSON.parse(
-      event.body
-    );
-    const res = await updateServicePoint({
-      id: servicePointId,
-      serviceIds,
-      name,
-      description,
-      servicePointNumber,
-    });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
-
-export const removeServicePointHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-
-  if (!check(event, EAction.Delete, ESubject.ServicePoint)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-
-  try {
-    const id = event.pathParameters?.servicePointId;
-    if (!id) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const res = await deleteServicePoint({ id });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
-
-export const updateServicePointStatusHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-
-  if (!check(event, EAction.UpdateStatus, ESubject.ServicePoint)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-
-  try {
-    const id = event.pathParameters?.servicePointId;
-    if (!id) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const status = event.pathParameters?.status as ServicePointStatus;
-    if (!status) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
+        statusCode: 403,
+        body: `Forbidden`,
       };
     }
 
-    const res = await updateServicePointStatus({
-      id,
-      servicePointStatus: status,
-    });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
+    try {
+      const servicePointId = event.pathParameters?.servicePointId;
+      if (!servicePointId) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const { serviceIds, servicePointNumber, name, description } = JSON.parse(
+        event.body
+      );
+      const res = await updateServicePoint({
+        id: servicePointId,
+        serviceIds,
+        name,
+        description,
+        servicePointNumber,
+      });
+      return {
+        statusCode: 200,
+        body: JSON.stringify(res),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
+
+export const removeServicePointHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Delete, ESubject.ServicePoint)) {
+      return {
+        statusCode: 403,
+        body: `Forbidden`,
+      };
+    }
+
+    try {
+      const id = event.pathParameters?.servicePointId;
+      if (!id) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const res = await deleteServicePoint({ id });
+      return {
+        statusCode: 200,
+        body: JSON.stringify(res),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
+
+export const updateServicePointStatusHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.UpdateStatus, ESubject.ServicePoint)) {
+      return {
+        statusCode: 403,
+        body: `Forbidden`,
+      };
+    }
+
+    try {
+      const id = event.pathParameters?.servicePointId;
+      if (!id) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const status = event.pathParameters?.status as ServicePointStatus;
+      if (!status) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+
+      const res = await updateServicePointStatus({
+        id,
+        servicePointStatus: status,
+      });
+      return {
+        statusCode: 200,
+        body: JSON.stringify(res),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
 
 // dynamodb stream handler
 export const servicePointStreamHandler: DynamoDBStreamHandler = async (

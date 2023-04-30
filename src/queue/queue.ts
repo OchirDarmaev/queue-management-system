@@ -3,10 +3,9 @@ import {
   QueryCommand,
   BatchGetCommand,
   UpdateCommand,
-  PutCommand,
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { APIGatewayProxyHandler } from "aws-lambda";
+import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
 import { ddbDocClient } from "../ddb-doc-client";
 import { TableName } from "../table-name";
 import { ulid } from "ulid";
@@ -22,179 +21,172 @@ import { check } from "../auth/check";
 import { EAction } from "../auth/enums/action.enum";
 import { ESubject } from "../auth/enums/subject.enum";
 
-export const createQueueItemHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Create, ESubject.QueueItem)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-
-  try {
-    const serviceId = event.pathParameters?.serviceId;
-    if (!serviceId) {
+export const createQueueItemHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Create, ESubject.QueueItem)) {
       return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const res = await createQueueItem({ serviceId });
-    return {
-      statusCode: 201,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
-
-export const getQueueItemHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Read, ESubject.QueueItem)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-  try {
-    const queueId = event.pathParameters?.queueId;
-    if (!queueId) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const item = await getQueueItem({
-      queueId,
-    });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(item),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
-
-export const getQueueItemsHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Read, ESubject.QueueItem)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-  try {
-    const serviceId = event.pathParameters?.serviceId;
-    if (!serviceId) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const res = await getQueueItems({ serviceId });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
-
-export const updateQueueItemHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Update, ESubject.QueueItem)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-  try {
-    const queueId = event.pathParameters?.queueId;
-    if (!queueId) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
+        statusCode: 403,
+        body: `Forbidden`,
       };
     }
 
-    if (!event.body) {
+    try {
+      const serviceId = event.pathParameters?.serviceId;
+      if (!serviceId) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const res = await createQueueItem({ serviceId });
       return {
-        statusCode: 400,
-        body: "Bad Request",
+        statusCode: 201,
+        body: JSON.stringify(res),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
       };
     }
-    const { priority } = JSON.parse(event.body);
-    if (!priority) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const res = await updateQueueItem({
-      queueId,
-      priority,
-    });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
+  };
 
-export const getQueueStatusHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Read, ESubject.QueueItem)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-  
-  try {
-    const res = await getQueuedInfo();
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
+export const getQueueItemHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Read, ESubject.QueueItem)) {
+      return {
+        statusCode: 403,
+        body: `Forbidden`,
+      };
+    }
+    try {
+      const queueId = event.pathParameters?.queueId;
+      if (!queueId) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const item = await getQueueItem({
+        queueId,
+      });
+      return {
+        statusCode: 200,
+        body: JSON.stringify(item),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
+
+export const getQueueItemsHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Read, ESubject.QueueItem)) {
+      return {
+        statusCode: 403,
+        body: `Forbidden`,
+      };
+    }
+    try {
+      const serviceId = event.pathParameters?.serviceId;
+      if (!serviceId) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const res = await getQueueItems({ serviceId });
+      return {
+        statusCode: 200,
+        body: JSON.stringify(res),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
+
+export const updateQueueItemHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Update, ESubject.QueueItem)) {
+      return {
+        statusCode: 403,
+        body: `Forbidden`,
+      };
+    }
+    try {
+      const queueId = event.pathParameters?.queueId;
+      if (!queueId) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const { priority } = JSON.parse(event.body);
+      if (!priority) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const res = await updateQueueItem({
+        queueId,
+        priority,
+      });
+      return {
+        statusCode: 200,
+        body: JSON.stringify(res),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
+
+export const getQueueStatusHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Read, ESubject.QueueItem)) {
+      return {
+        statusCode: 403,
+        body: `Forbidden`,
+      };
+    }
+
+    try {
+      const res = await getQueuedInfo();
+      return {
+        statusCode: 200,
+        body: JSON.stringify(res),
+        headers: {
+          "content-type": "application/json",
+        },
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
 
 async function getQueueItem({ queueId }: { queueId: string }): Promise<{
   item: QueueItem;

@@ -67,7 +67,7 @@ functions:
   testPublic:
     handler: src/test/test.handlerPublic
     events:
-      - http:
+      - httpApi:
           method: GET
           path: /test/public
 
@@ -75,33 +75,43 @@ functions:
   createServicePoint:
     handler: src/servicePoints/servicePoints.createServicePointHandler
     events:
-      - http:
+      - httpApi:
           method: POST
           path: /servicePoints
+          authorizer:
+            name: myAuthorizer
   getServicePoint:
     handler: src/servicePoints/servicePoints.getServicePointHandler
     events:
-      - http:
+      - httpApi:
           method: GET
           path: /servicePoints/{servicePointId}
+          authorizer:
+            name: myAuthorizer
   getServicePoints:
     handler: src/servicePoints/servicePoints.getServicePointsHandler
     events:
-      - http:
+      - httpApi:
           method: GET
           path: /servicePoints
+          authorizer:
+            name: myAuthorizer
   updateServicePoint:
     handler: src/servicePoints/servicePoints.updateServicePointHandler
     events:
-      - http:
+      - httpApi:
           method: PUT
           path: /servicePoints/{servicePointId}
+          authorizer:
+            name: myAuthorizer
   updateServicePointStatus:
     handler: src/servicePoints/servicePoints.updateServicePointStatusHandler
     events:
-      - http:
+      - httpApi:
           method: PUT
           path: /servicePoints/{servicePointId}/status/{status}
+          authorizer:
+            name: myAuthorizer
   updateServicePointStatusNewItem:
     handler: src/servicePoints/servicePoints.servicePointStreamHandler
     events:
@@ -119,74 +129,96 @@ functions:
   removeServicePoint:
     handler: src/servicePoints/servicePoints.removeServicePointHandler
     events:
-      - http:
+      - httpApi:
           method: DELETE
           path: /servicePoints/{servicePointId}
+          authorizer:
+            name: myAuthorizer
 
   #Service
   createService:
     handler: src/services/services.createServiceHandler
     events:
-      - http:
+      - httpApi:
           method: POST
           path: /services
+          authorizer:
+            name: myAuthorizer
   getAllServices:
     handler: src/services/services.getAllServicesHandler
     events:
-      - http:
+      - httpApi:
           method: GET
           path: /services
+          authorizer:
+            name: myAuthorizer
 
   getService:
     handler: src/services/services.getServiceHandler
     events:
-      - http:
+      - httpApi:
           method: GET
           path: /services/{serviceId}
+          authorizer:
+            name: myAuthorizer
   updateService:
     handler: src/services/services.updateServiceHandler
     events:
-      - http:
+      - httpApi:
           method: PUT
           path: /services/{serviceId}
+          authorizer:
+            name: myAuthorizer
   deleteService:
     handler: src/services/services.deleteServiceHandler
     events:
-      - http:
+      - httpApi:
           method: DELETE
           path: /services/{serviceId}
+          authorizer:
+            name: myAuthorizer
 
   # queue
   createQueueItem:
     handler: src/queue/queue.createQueueItemHandler
     events:
-      - http:
+      - httpApi:
           method: POST
           path: "/services/{serviceId}/queue"
+          authorizer:
+            name: myAuthorizer
   getQueueItems:
     handler: src/queue/queue.getQueueItemsHandler
     events:
-      - http:
+      - httpApi:
           method: GET
           path: "/services/{serviceId}/queue"
+          authorizer:
+            name: myAuthorizer
   updateQueueItem:
     handler: src/queue/queue.updateQueueItemHandler
     events:
-      - http:
+      - httpApi:
           method: PUT
           path: "/queue/{queueId}"
+          authorizer:
+            name: myAuthorizer
   getQueueItem:
     handler: src/queue/queue.getQueueItemHandler
     events:
-      - http:
+      - httpApi:
           method: GET
           path: "/queue/{queueId}"
+          authorizer:
+            name: myAuthorizer
   getQueueStatus:
     handler: src/queue/queue.getQueueStatusHandler
     events:
-      - http:
+      - httpApi:
           method: GET
           path: "/queue/status"
+          authorizer:
+            name: myAuthorizer
 
 plugins:
   - serverless-esbuild

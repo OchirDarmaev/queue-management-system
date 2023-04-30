@@ -1,17 +1,16 @@
-import { APIGatewayProxyHandler } from "aws-lambda";
+import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
 import { ddbDocClient } from "../ddb-doc-client";
 import { ulid } from "ulid";
 
 import {
-  BatchGetCommand,
   UpdateCommand,
-  TransactWriteCommand,
   PutCommand,
   DeleteCommand,
   GetCommand,
+  QueryCommand,
 } from "@aws-sdk/lib-dynamodb";
+
 import { TableName } from "../table-name";
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 
 import { IService } from "./IService";
 import { ServiceItem } from "./ServiceItem";
@@ -20,10 +19,9 @@ import { EAction } from "../auth/enums/action.enum";
 import { ESubject } from "../auth/enums/subject.enum";
 
 // GET createServiceHandler
-export const createServiceHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
+export const createServiceHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer<
+  IService
+> = async (event, context) => {
   if (!check(event, EAction.Create, ESubject.Services)) {
     return {
       statusCode: 403,
@@ -43,6 +41,9 @@ export const createServiceHandler: APIGatewayProxyHandler = async (
     return {
       statusCode: 201,
       body: JSON.stringify(res),
+      headers: {
+        "content-type": "application/json",
+      },
     };
   } catch (error) {
     console.error(error);
@@ -54,10 +55,9 @@ export const createServiceHandler: APIGatewayProxyHandler = async (
 };
 
 // GET getAllServicesHandler
-export const getAllServicesHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
+export const getAllServicesHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer<
+  IService[]
+> = async (event, context) => {
   if (!check(event, EAction.Read, ESubject.Services)) {
     return {
       statusCode: 403,
@@ -66,10 +66,7 @@ export const getAllServicesHandler: APIGatewayProxyHandler = async (
   }
   try {
     const result = await getServices();
-    return {
-      statusCode: 200,
-      body: JSON.stringify(result),
-    };
+    return result;
   } catch (error) {
     console.error(error);
     return {
@@ -80,10 +77,9 @@ export const getAllServicesHandler: APIGatewayProxyHandler = async (
 };
 
 // GET getServicesHandler
-export const getServicesHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
+export const getServicesHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer<
+  IService[]
+> = async (event) => {
   if (!check(event, EAction.Read, ESubject.Services)) {
     return {
       statusCode: 403,
@@ -92,10 +88,7 @@ export const getServicesHandler: APIGatewayProxyHandler = async (
   }
   try {
     const result = await getServices();
-    return {
-      statusCode: 200,
-      body: JSON.stringify(result),
-    };
+    return result;
   } catch (error) {
     console.error(error);
     return {
@@ -106,111 +99,105 @@ export const getServicesHandler: APIGatewayProxyHandler = async (
 };
 
 // getServiceHandler
-export const getServiceHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Read, ESubject.Services)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-  try {
-    const id = event.pathParameters?.serviceId;
-    if (!id) {
+export const getServiceHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Read, ESubject.Services)) {
       return {
-        statusCode: 400,
-        body: "Bad Request",
+        statusCode: 403,
+        body: `Forbidden`,
       };
     }
-    const service = await getService(id);
-    return {
-      statusCode: 200,
-      body: JSON.stringify(service),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
+    try {
+      const id = event.pathParameters?.serviceId;
+      if (!id) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      const service = await getService(id);
+      return {
+        statusCode: 200,
+        body: JSON.stringify(service),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
 
 // PUT updateServiceHandler
-export const updateServiceHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Update, ESubject.Services)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-  try {
-    const id = event.pathParameters?.serviceId;
-    if (!id) {
+export const updateServiceHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Update, ESubject.Services)) {
       return {
-        statusCode: 400,
-        body: "Bad Request",
+        statusCode: 403,
+        body: `Forbidden`,
       };
     }
-    if (!event.body) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
+    try {
+      const id = event.pathParameters?.serviceId;
+      if (!id) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      if (!event.body) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
 
-    const { name, description } = JSON.parse(event.body);
-    const service = await updateService({ id, name, description });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(service),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
+      const { name, description } = JSON.parse(event.body);
+      const service = await updateService({ id, name, description });
+      return {
+        statusCode: 200,
+        body: JSON.stringify(service),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
 
 // DELETE deleteServiceHandler
-export const deleteServiceHandler: APIGatewayProxyHandler = async (
-  event,
-  context
-) => {
-  if (!check(event, EAction.Delete, ESubject.Services)) {
-    return {
-      statusCode: 403,
-      body: `Forbidden`,
-    };
-  }
-  try {
-    const id = event.pathParameters?.serviceId;
-    if (!id) {
+export const deleteServiceHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
+  async (event, context) => {
+    if (!check(event, EAction.Delete, ESubject.Services)) {
       return {
-        statusCode: 400,
-        body: "Bad Request",
+        statusCode: 403,
+        body: `Forbidden`,
       };
     }
-    await deleteService(id);
-    return {
-      statusCode: 200,
-      body: JSON.stringify({}),
-    };
-  } catch (error) {
-    console.error(error);
-    return {
-      statusCode: 500,
-      body: "Internal Server Error",
-    };
-  }
-};
+    try {
+      const id = event.pathParameters?.serviceId;
+      if (!id) {
+        return {
+          statusCode: 400,
+          body: "Bad Request",
+        };
+      }
+      await deleteService(id);
+      return {
+        statusCode: 200,
+        body: JSON.stringify({}),
+      };
+    } catch (error) {
+      console.error(error);
+      return {
+        statusCode: 500,
+        body: "Internal Server Error",
+      };
+    }
+  };
 
 async function getService(id: string): Promise<IService> {
   const result = await ddbDocClient.send(

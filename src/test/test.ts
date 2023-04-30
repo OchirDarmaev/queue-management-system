@@ -1,12 +1,15 @@
 //test handler
 
-import { APIGatewayProxyEvent } from "aws-lambda";
+import {
+  APIGatewayProxyEvent,
+  APIGatewayProxyEventV2WithJWTAuthorizer,
+} from "aws-lambda";
 import { EAction } from "../auth/enums/action.enum";
 import { ESubject } from "../auth/enums/subject.enum";
 import { check } from "../auth/check";
 
 export const handlerProtected = async (
-  event: APIGatewayProxyEvent,
+  event: APIGatewayProxyEventV2WithJWTAuthorizer,
   _context
 ) => {
   // log event to dynamodb table
@@ -62,6 +65,9 @@ export const handlerPublic = async (event: APIGatewayProxyEvent, _context) => {
       body: JSON.stringify({
         response,
       }),
+      headers: {
+        "content-type": "application/json",
+      },
     };
   } catch (err) {
     console.log(err);
