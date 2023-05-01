@@ -221,6 +221,19 @@ functions:
           path: "/queue/status"
           authorizer:
             name: myAuthorizer
+  updateBoard:
+    handler: src/queue/queue.updateBoardHandler
+    events:
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt: [OneTable, StreamArn]
+          filterPatterns:
+            - eventName: [INSERT, MODIFY]
+              dynamodb:
+                NewImage:
+                  PK:
+                    S: [Q#]
 
 plugins:
   - serverless-esbuild

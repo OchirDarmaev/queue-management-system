@@ -451,7 +451,7 @@ async function updateServicePointStatus({
   servicePointStatus: newServicePointStatus,
 }: Pick<IServicePoint, "id" | "servicePointStatus">) {
   const servicePoint = await getServicePoint2(id);
-
+  console.log("status", servicePoint.servicePointStatus, newServicePointStatus);
   switch (servicePoint.servicePointStatus) {
     case ServicePointStatus.CLOSED:
       switch (newServicePointStatus) {
