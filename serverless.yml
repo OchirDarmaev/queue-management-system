@@ -15,6 +15,8 @@ provider:
     USER_POOL_CLIENT_NAME: ${self:service}-${sls:stage}-user-pool-client
     USER_POOL_DOMAIN: ${self:service}-${sls:stage}-user-pool-domain
     TOPIC_PREFIX: ${self:service}/${sls:stage}
+    IDENTITY_POOL_NAME: ${self:service}-${sls:stage}-identity-pool
+
   httpApi:
     cors: true
     authorizers:
@@ -277,6 +279,90 @@ resources:
         StreamSpecification:
           StreamViewType: "NEW_AND_OLD_IMAGES"
 
+    CognitoIdentityPool:
+      Type: "AWS::Cognito::IdentityPool"
+      Properties:
+        IdentityPoolName: ${self:provider.environment.IDENTITY_POOL_NAME}
+        AllowUnauthenticatedIdentities: false
+        CognitoIdentityProviders:
+          - ClientId:
+              Ref: "CognitoUserPoolClient"
+            ProviderName:
+              Fn::GetAtt: [CognitoUserPool, ProviderName]
+    CognitoUnAuthorizedRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        RoleName: "queue-management-system-unauthorized-role"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                Federated: "cognito-identity.amazonaws.com"
+              Action:
+                - "sts:AssumeRoleWithWebIdentity"
+              Condition:
+                StringEquals:
+                  "cognito-identity.amazonaws.com:aud":
+                    Ref: CognitoIdentityPool
+                "ForAnyValue:StringLike":
+                  "cognito-identity.amazonaws.com:amr": unauthenticated
+        Policies:
+          - PolicyName: "CognitoUnauthorizedPolicy"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "mobileanalytics:PutEvents"
+                    - "cognito-sync:*"
+                  Resource: "*"
+
+    # Create a role for authorized acces to AWS resources. Control what your user can access. This example only allows Lambda invokation
+    # Only allows users in the previously created Identity Pool
+    CognitoAuthorizedRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        RoleName: "queue-management-system-authorized-role"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                Federated: "cognito-identity.amazonaws.com"
+              Action:
+                - "sts:AssumeRoleWithWebIdentity"
+              Condition:
+                StringEquals:
+                  "cognito-identity.amazonaws.com:aud":
+                    Ref: CognitoIdentityPool
+                "ForAnyValue:StringLike":
+                  "cognito-identity.amazonaws.com:amr": authenticated
+        Policies:
+          - PolicyName: "CognitoAuthorizedPolicy"
+            PolicyDocument:
+              Version: "2012-10-17"
+              Statement:
+                - Effect: "Allow"
+                  Action:
+                    - "mobileanalytics:PutEvents"
+                    - "cognito-sync:*"
+                    - "cognito-identity:*"
+                  Resource: "*"
+        ManagedPolicyArns:
+          - "arn:aws:iam::aws:policy/AWSIoTDataAccess"
+
+    IdentityPoolRoleMapping:
+      Type: "AWS::Cognito::IdentityPoolRoleAttachment"
+      Properties:
+        IdentityPoolId:
+          Ref: CognitoIdentityPool
+        Roles:
+          authenticated:
+            "Fn::GetAtt": [CognitoAuthorizedRole, Arn]
+          unauthenticated:
+            "Fn::GetAtt": [CognitoUnAuthorizedRole, Arn]
+
     CognitoUserPool:
       Type: "AWS::Cognito::UserPool"
       Properties:
@@ -309,6 +395,9 @@ resources:
         Description: "Admin group for queue management system"
         UserPoolId:
           Ref: "CognitoUserPool"
+        Precedence: 1
+        RoleArn:
+          Fn::GetAtt: [AdminRole, Arn]
     GroupSpecialist:
       Type: "AWS::Cognito::UserPoolGroup"
       Properties:
@@ -316,6 +405,7 @@ resources:
         Description: "Specialist group for queue management system"
         UserPoolId:
           Ref: "CognitoUserPool"
+        Precedence: 2
     GroupClient:
       Type: "AWS::Cognito::UserPoolGroup"
       Properties:
@@ -323,57 +413,22 @@ resources:
         Description: "Client group for queue management system"
         UserPoolId:
           Ref: "CognitoUserPool"
-
-  #       Precedence: 1
-  #       RoleArn:
-  #         Fn::GetAtt: [AdminRole, Arn]
-  #   AdminRole:
-  #     Type: "AWS::IAM::Role"
-  #     Properties:
-  #       RoleName: "queue-management-system-admin-role"
-  #       AssumeRolePolicyDocument:
-  #         Version: "2012-10-17"
-  #         Statement:
-  #           - Effect: "Allow"
-  #             Principal:
-  #               Federated: "cognito-identity.amazonaws.com"
-  #             Action:
-  #               - "sts:AssumeRoleWithWebIdentity"
-  #             Condition:
-  #               StringEquals:
-  #                 "cognito-identity.amazonaws.com:aud":
-  #                   Ref: "CognitoUserPool"
-  #               "ForAnyValue:StringLike":
-  #                 "cognito-identity.amazonaws.com:amr": "authenticated"
-  #   # Policies:
-  #   #   - PolicyName: "ServicePointManagementPolicy"
-  #   #     PolicyDocument:
-  #   #       Version: "2012-10-17"
-  #   #       Statement:
-  #   #         - Effect: "Allow"
-  #   #           Action:
-  #   #             - "execute-api:Invoke"
-  #   #           Resource:
-  #   #             Fn::Join:
-  #   #               - ""
-  #   #               - - "arn:aws:execute-api:"
-  #   #                 - !Ref AWS::Region
-  #   #                 - ":"
-  #   #                 - !Ref AWS::AccountId
-  #   #                 - ":"
-  #   #                 - !Ref HttpApi
-  #   #                 - "/*/*"
-
-  # # iam:
-  # #   role:
-  # #     statements:
-  # #       # Allow access to ServicePoint functions for admins only
-  # #       - Effect: Allow
-  # #         Action:
-  # #           - "execute-api:Invoke"
-  # #         Resource:
-  # #           - "execute-api:/prod/*/*/servicePoints"
-  # #         Condition:
-  # #           StringEquals:
-  # #             "cognito:groups":
-  # #               - "Admin"
+        Precedence: 3
+    AdminRole:
+      Type: "AWS::IAM::Role"
+      Properties:
+        RoleName: "queue-management-system-admin-role"
+        AssumeRolePolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+            - Effect: "Allow"
+              Principal:
+                Federated: "cognito-identity.amazonaws.com"
+              Action:
+                - "sts:AssumeRoleWithWebIdentity"
+              Condition:
+                StringEquals:
+                  "cognito-identity.amazonaws.com:aud":
+                    Ref: "CognitoUserPool"
+                "ForAnyValue:StringLike":
+                  "cognito-identity.amazonaws.com:amr": "authenticated"
