@@ -545,7 +545,7 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
     return;
   }
   queueItem.queueStatus = QueueStatus.PENDING;
-  queueItem.date = new Date().toISOString();
+
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -604,7 +604,6 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
   const queueItem = QueueItem.fromItem(res.Item);
 
   queueItem.queueStatus = QueueStatus.QUEUED;
-  queueItem.date = new Date().toISOString();
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -660,7 +659,6 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
   }
   const queueItem = QueueItem.fromItem(res.Item);
   queueItem.queueStatus = QueueStatus.IN_SERVICE;
-  queueItem.date = new Date().toISOString();
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -718,7 +716,7 @@ async function markAsServed(servicePoint: ServicePointItem) {
   }
   const queueItem = QueueItem.fromItem(res.Item);
   queueItem.queueStatus = QueueStatus.SERVED;
-  queueItem.date = new Date().toISOString();
+
 
   await ddbDocClient.send(
     new TransactWriteCommand({
