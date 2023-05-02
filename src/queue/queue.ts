@@ -49,6 +49,9 @@ export const createQueueItemHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
       return {
         statusCode: 201,
         body: JSON.stringify(res),
+        headers: {
+          "content-type": "application/json",
+        },
       };
     } catch (error) {
       console.error(error);
@@ -352,7 +355,7 @@ async function createQueueItem({ serviceId }: { serviceId: string }): Promise<{
 }
 
 async function getQueuePosition(queueItem: QueueItem): Promise<number> {
-  if (!queueItem.GSI1SK.startsWith(QueueItem.prefix + QueueStatus.QUEUED)) {
+  if (queueItem.queueStatus !== QueueStatus.QUEUED) {
     return -1;
   }
 
