@@ -454,11 +454,12 @@ export async function getBoardStatus({
   const servicePointIsInProgress = servicePoints.filter(
     (x) =>
       x.servicePointStatus === ServicePointStatus.IN_SERVICE ||
-      x.servicePointStatus === ServicePointStatus.WAITING
+      (x.servicePointStatus === ServicePointStatus.WAITING &&
+        x.currentQueueItem)
   );
 
   const keys = servicePointIsInProgress.map((servicePoint) =>
-    QueueItem.buildKey(servicePoint.currentQueueItem!)
+    QueueItem.buildKey(servicePoint.currentQueueItem)
   );
 
   if (keys.length === 0) {

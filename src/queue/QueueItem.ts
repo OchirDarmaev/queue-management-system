@@ -5,7 +5,7 @@ import { QueueStatus } from "./QueueStatus";
 import { IQueueItem } from "./IQueueItem";
 
 export class QueueItem extends Item {
-  static prefix = "Q#"
+  static prefix = "Q#";
   static prefixQueueStatus = "Q_STATUS#";
 
   public id: string;
@@ -67,6 +67,9 @@ export class QueueItem extends Item {
     PK: string;
     SK: string;
   } {
+    if (!queueId) {
+      throw new Error("queueId is required");
+    }
     return {
       PK: QueueItem.prefix,
       SK: QueueItem.prefix + queueId,
