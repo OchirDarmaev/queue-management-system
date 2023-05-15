@@ -8,3 +8,7 @@ jspm_packages
 .esbuild
 .idea
 .temp
+
+#IDE
+.vscode
+.idea
