@@ -1,8 +1,8 @@
-import { Item } from "../baseItem";
-import { ServiceItem } from "../services/ServiceItem";
-import { QueuePriority } from "./QueuePriority";
-import { QueueStatus } from "./QueueStatus";
-import { IQueueItem } from "./IQueueItem";
+import { Item } from "../../../baseItem";
+import { ServiceItem } from "../../../services/ServiceItem";
+import { IQueueItem } from "../queue-item.interface";
+import { EQueuePriority } from "../enums/queue-priority.enum";
+import { EQueueStatus } from "../enums/queue-status.enum";
 
 export class QueueItem extends Item {
   static prefix = "Q#";
@@ -10,8 +10,8 @@ export class QueueItem extends Item {
 
   public id: string;
   public serviceId: string;
-  public queueStatus: QueueStatus;
-  public priority: QueuePriority;
+  public queueStatus: EQueueStatus;
+  public priority: EQueuePriority;
   public date: string;
   public memorableId: string;
   constructor(queueItem: IQueueItem) {
@@ -56,8 +56,8 @@ export class QueueItem extends Item {
     return new QueueItem({
       id: (item.SK as string).replace(QueueItem.prefix, ""),
       serviceId: item.serviceId as string,
-      queueStatus: item.queueStatus as QueueStatus,
-      priority: item.priority as QueuePriority,
+      queueStatus: item.queueStatus as EQueueStatus,
+      priority: item.priority as EQueuePriority,
       date: item.date as string,
       memorableId: item.memorableId as string,
     });

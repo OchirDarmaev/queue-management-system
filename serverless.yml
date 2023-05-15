@@ -5,7 +5,7 @@ frameworkVersion: "3"
 
 provider:
   name: aws
-  runtime: nodejs12.x
+  runtime: nodejs18.x
   stage: dev
   region: us-east-1
   profile: "serverlessUser"
@@ -182,58 +182,59 @@ functions:
 
   # queue
   createQueueItem:
-    handler: src/queue/queue.createQueueItemHandler
+    handler: src/functions/queues/create-queue-item/handler.handler
     events:
       - httpApi:
           method: POST
-          path: "/services/{serviceId}/queue"
+          path: "/queues"
           authorizer:
             name: myAuthorizer
-  getQueueItems:
-    handler: src/queue/queue.getQueueItemsHandler
-    events:
-      - httpApi:
-          method: GET
-          path: "/services/{serviceId}/queue"
-          authorizer:
-            name: myAuthorizer
-  updateQueueItem:
-    handler: src/queue/queue.updateQueueItemHandler
-    events:
-      - httpApi:
-          method: PUT
-          path: "/queue/{queueId}"
-          authorizer:
-            name: myAuthorizer
+          
+  # getQueueItems:
+  #   handler: src/queue/queue.getQueueItemsHandler
+  #   events:
+  #     - httpApi:
+  #         method: GET
+  #         path: "/services/{serviceId}/queue"
+  #         authorizer:
+  #           name: myAuthorizer
+  # updateQueueItem:
+  #   handler: src/queue/queue.updateQueueItemHandler
+  #   events:
+  #     - httpApi:
+  #         method: PUT
+  #         path: "/queues/{queueId}"
+  #         authorizer:
+  #           name: myAuthorizer
   getQueueItem:
-    handler: src/queue/queue.getQueueItemHandler
+    handler: src/functions/queues/get-queue-item/handler.handler
     events:
       - httpApi:
           method: GET
-          path: "/queue/{queueId}"
+          path: "/queues/{queueId}"
           authorizer:
             name: myAuthorizer
-  getQueueStatus:
-    handler: src/queue/queue.getQueueStatusHandler
-    events:
-      - httpApi:
-          method: GET
-          path: "/queue/status"
-          authorizer:
-            name: myAuthorizer
-  updateBoard:
-    handler: src/queue/queue.updateBoardHandler
-    events:
-      - stream:
-          type: dynamodb
-          arn:
-            Fn::GetAtt: [OneTable, StreamArn]
-          filterPatterns:
-            - eventName: [INSERT, MODIFY]
-              dynamodb:
-                NewImage:
-                  PK:
-                    S: [Q#]
+  # getQueueStatus:
+  #   handler: src/queue/queue.getQueueStatusHandler
+  #   events:
+  #     - httpApi:
+  #         method: GET
+  #         path: "/queues/status"
+  #         authorizer:
+  #           name: myAuthorizer
+  # updateBoard:
+  #   handler: src/queue/queue.updateBoardHandler
+  #   events:
+  #     - stream:
+  #         type: dynamodb
+  #         arn:
+  #           Fn::GetAtt: [OneTable, StreamArn]
+  #         filterPatterns:
+  #           - eventName: [INSERT, MODIFY]
+  #             dynamodb:
+  #               NewImage:
+  #                 PK:
+  #                   S: [Q#]
 
 plugins:
   - serverless-esbuild
@@ -331,7 +332,7 @@ resources:
                     - "cognito-sync:*"
                   Resource: "*"
 
-    # Create a role for authorized acces to AWS resources. Control what your user can access. This example only allows Lambda invokation
+    # Create a role for authorized access to AWS resources. Control what your user can access. This example only allows Lambda invokation
     # Only allows users in the previously created Identity Pool
     CognitoAuthorizedRole:
       Type: "AWS::IAM::Role"

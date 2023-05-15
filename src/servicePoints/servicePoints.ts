@@ -13,9 +13,8 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { TableName } from "../table-name";
-import { getItemsByStatus1 } from "../queue/queue";
-import { QueueItem } from "../queue/QueueItem";
-import { QueueStatus } from "../queue/QueueStatus";
+import { getItemsByStatus1 } from "../functions/queues/queue";
+import { QueueItem } from "../functions/queues/model/QueueItem";
 import { ServiceItem } from "../services/ServiceItem";
 import { ServicePointStatus } from "./ServicePointStatus";
 import { IServicePoint } from "./IServicePoint";
@@ -23,6 +22,7 @@ import { ServicePointItem } from "./ServicePointItem";
 import { check } from "../auth/check";
 import { EAction } from "../auth/enums/action.enum";
 import { ESubject } from "../auth/enums/subject.enum";
+import { EQueueStatus } from "../functions/queues/enums/queue-status.enum";
 
 export const createServicePointHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer =
   async (event, context) => {
@@ -523,7 +523,7 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
   const items = await getItemsByStatus1({
     servicePoints: [servicePoint],
     limit: 1,
-    queueStatus: QueueStatus.QUEUED,
+    queueStatus: EQueueStatus.QUEUED,
   });
   const queueItem = items[0];
   if (!queueItem) {
@@ -544,7 +544,7 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
     );
     return;
   }
-  queueItem.queueStatus = QueueStatus.PENDING;
+  queueItem.queueStatus = EQueueStatus.PENDING;
 
 
   await ddbDocClient.send(
@@ -603,7 +603,7 @@ async function putItemBackToQueue(servicePoint: ServicePointItem) {
   }
   const queueItem = QueueItem.fromItem(res.Item);
 
-  queueItem.queueStatus = QueueStatus.QUEUED;
+  queueItem.queueStatus = EQueueStatus.QUEUED;
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -658,7 +658,7 @@ async function startServicingItemQueue(servicePoint: ServicePointItem) {
     throw new Error("Queue item not found");
   }
   const queueItem = QueueItem.fromItem(res.Item);
-  queueItem.queueStatus = QueueStatus.IN_SERVICE;
+  queueItem.queueStatus = EQueueStatus.IN_SERVICE;
 
   await ddbDocClient.send(
     new TransactWriteCommand({
@@ -715,7 +715,7 @@ async function markAsServed(servicePoint: ServicePointItem) {
     throw new Error("Queue item not found");
   }
   const queueItem = QueueItem.fromItem(res.Item);
-  queueItem.queueStatus = QueueStatus.SERVED;
+  queueItem.queueStatus = EQueueStatus.SERVED;
 
 
   await ddbDocClient.send(
