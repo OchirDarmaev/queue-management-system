@@ -8,11 +8,12 @@ import { QueueItem } from "../model/QueueItem";
 import { getQueuePosition } from "../queue";
 import { createMemorableId } from "./create-memorable-id";
 import { TableName } from "../../../table-name";
-import { ICreateQueueItem } from "./create-queue-item.interface";
 
 export async function createQueueItem({
-  body: { serviceId },
-}: ICreateQueueItem): Promise<{
+  serviceId,
+}: {
+  serviceId: string;
+}): Promise<{
   item: QueueItem;
   queuePosition: number;
 }> {

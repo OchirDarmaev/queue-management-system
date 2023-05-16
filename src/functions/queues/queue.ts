@@ -11,41 +11,8 @@ import { ServicePointItem } from "../../servicePoints/ServicePointItem";
 import { ServicePointStatus } from "../../servicePoints/ServicePointStatus";
 import { EQueuePriority } from "./enums/queue-priority.enum";
 import { EQueueStatus } from "./enums/queue-status.enum";
-import { IQueueItem } from "./queue-item.interface";
 import { QueueItem } from "./model/QueueItem";
 import { getQueueItem } from "./get-queue-item/get-queue-item";
-
-export async function getQueueItems({
-  serviceId,
-}: {
-  serviceId: string;
-}): Promise<IQueueItem[]> {
-  const result = await ddbDocClient.send(
-    new QueryCommand({
-      TableName,
-      IndexName: "GSI1",
-      KeyConditionExpression: "GSI1PK = :gsi1pk",
-      ExpressionAttributeValues: {
-        ":gsi1pk": `${QueueItem.prefix}${ServiceItem.prefixService}${serviceId}`,
-      },
-      ScanIndexForward: true,
-    })
-  );
-
-  return (
-    result.Items?.map((item) => {
-      const i = QueueItem.fromItem(item);
-      return {
-        id: i.id,
-        serviceId: i.serviceId,
-        queueStatus: i.queueStatus,
-        priority: i.priority,
-        date: i.date,
-        memorableId: i.memorableId,
-      };
-    }) || []
-  );
-}
 
 export async function getQueuePosition(queueItem: QueueItem): Promise<number> {
   if (queueItem.queueStatus !== EQueueStatus.QUEUED) {
@@ -79,7 +46,7 @@ export async function updateQueueItem({
   queueId: string;
   priority: EQueuePriority;
 }) {
-  const queueItem = await getQueueItem({ pathParameters: { queueId } });
+  const queueItem = await getQueueItem({ queueId });
 
   queueItem.item.priority = priority;
 

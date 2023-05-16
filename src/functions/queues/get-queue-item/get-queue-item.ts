@@ -1,13 +1,10 @@
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddbDocClient } from "../../../ddb-doc-client";
 import { QueueItem } from "../model/QueueItem";
-import { IGetQueueItem } from "./get-queue-item.interface";
 import { getQueuePosition } from "../queue";
 import { TableName } from "../../../table-name";
 
-export async function getQueueItem({
-  pathParameters: { queueId },
-}: IGetQueueItem): Promise<{
+export async function getQueueItem({ queueId }: { queueId: string }): Promise<{
   item: QueueItem;
   queuePosition: number;
 }> {

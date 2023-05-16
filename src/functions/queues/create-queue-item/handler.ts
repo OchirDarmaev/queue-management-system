@@ -3,14 +3,39 @@ import { createQueueItem } from "./create-queue-item";
 import jsonBodyParser from "@middy/http-json-body-parser";
 import { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { validate } from "../../../middleware/validate";
-import { validateEventSchema } from "./schema.event";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
-import { ICreateQueueItem } from "./create-queue-item.interface";
+import Ajv, { JSONSchemaType } from "ajv";
+
+interface ICreateQueueItem {
+  body: {
+    serviceId: string;
+  };
+}
+
+const schema: JSONSchemaType<ICreateQueueItem> = {
+  type: "object",
+  required: ["body"],
+  properties: {
+    body: {
+      type: "object",
+      properties: {
+        serviceId: {
+          type: "string",
+          minLength: 26,
+          maxLength: 26,
+        },
+      },
+      required: ["serviceId"],
+    },
+  },
+};
+const validateEventSchema = new Ajv().compile(schema);
 
 const lambdaHandler: APIGatewayProxyHandlerV2 = async (
   event: APIGatewayProxyEventV2
 ) => {
-  const res = await createQueueItem(event as unknown as ICreateQueueItem);
+  const payload = event as unknown as ICreateQueueItem;
+  const res = await createQueueItem({ serviceId: payload.body.serviceId });
   return {
     statusCode: 201,
     body: JSON.stringify(res),
