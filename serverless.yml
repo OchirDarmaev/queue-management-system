@@ -189,23 +189,6 @@ functions:
           path: "/queues"
           authorizer:
             name: myAuthorizer
-          
-  # getQueueItems:
-  #   handler: src/queue/queue.getQueueItemsHandler
-  #   events:
-  #     - httpApi:
-  #         method: GET
-  #         path: "/services/{serviceId}/queue"
-  #         authorizer:
-  #           name: myAuthorizer
-  # updateQueueItem:
-  #   handler: src/queue/queue.updateQueueItemHandler
-  #   events:
-  #     - httpApi:
-  #         method: PUT
-  #         path: "/queues/{queueId}"
-  #         authorizer:
-  #           name: myAuthorizer
   getQueueItem:
     handler: src/functions/queues/get-queue-item/handler.handler
     events:
@@ -214,27 +197,45 @@ functions:
           path: "/queues/{queueId}"
           authorizer:
             name: myAuthorizer
-  # getQueueStatus:
-  #   handler: src/queue/queue.getQueueStatusHandler
-  #   events:
-  #     - httpApi:
-  #         method: GET
-  #         path: "/queues/status"
-  #         authorizer:
-  #           name: myAuthorizer
-  # updateBoard:
-  #   handler: src/queue/queue.updateBoardHandler
-  #   events:
-  #     - stream:
-  #         type: dynamodb
-  #         arn:
-  #           Fn::GetAtt: [OneTable, StreamArn]
-  #         filterPatterns:
-  #           - eventName: [INSERT, MODIFY]
-  #             dynamodb:
-  #               NewImage:
-  #                 PK:
-  #                   S: [Q#]
+  getQueueItems:
+    handler: src/functions/queues/get-queue-items/handler.handler
+    events:
+      - httpApi:
+          method: GET
+          path: "/services/{serviceId}/queue"
+          authorizer:
+            name: myAuthorizer
+  updateQueueItem:
+    handler: src/functions/queues/update-queue-item/handler.handler
+    events:
+      - httpApi:
+          method: PUT
+          path: "/queues/{queueId}"
+          authorizer:
+            name: myAuthorizer
+
+  #Board
+  getQueueStatus:
+    handler: src/functions/boards/get-board-status/handler.handler
+    events:
+      - httpApi:
+          method: GET
+          path: "/boards/status"
+          authorizer:
+            name: myAuthorizer
+  sendUpdatesToBoard:
+    handler: src/functions/boards/send-updates-to-board/handler.handler
+    events:
+      - stream:
+          type: dynamodb
+          arn:
+            Fn::GetAtt: [OneTable, StreamArn]
+          filterPatterns:
+            - eventName: [INSERT, MODIFY]
+              dynamodb:
+                NewImage:
+                  PK:
+                    S: [Q#]
 
 plugins:
   - serverless-esbuild

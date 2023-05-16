@@ -3,9 +3,9 @@ import {
   IoTDataPlaneClient,
   PublishCommand,
 } from "@aws-sdk/client-iot-data-plane";
-import { getQueuedInfo } from "../get-queue-status/get-queued-info";
+import { getQueuedInfo } from "../get-board-status/get-queued-info";
 
-export const sendNotificationToBoard = async (event: DynamoDBStreamEvent) => {
+export const sendUpdatesToBoard = async (event: DynamoDBStreamEvent) => {
   const records = event.Records;
   if (!records?.length) {
     return;
