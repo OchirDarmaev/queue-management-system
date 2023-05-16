@@ -1,10 +1,6 @@
 import middy from "@middy/core";
-import { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 
-export const onErrorHandler: middy.MiddlewareFn<
-  APIGatewayProxyEventV2,
-  APIGatewayProxyResultV2
-> = (request) => {
+export const onErrorHandler: middy.MiddlewareFn = (request) => {
   const error = request.error as {
     statusCode?: number;
     message?: string;

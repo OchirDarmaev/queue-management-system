@@ -332,7 +332,7 @@ resources:
                     - "cognito-sync:*"
                   Resource: "*"
 
-    # Create a role for authorized access to AWS resources. Control what your user can access. This example only allows Lambda invokation
+    # Create a role for authorized access to AWS resources. Control what your user can access. This example only allows Lambda invocation
     # Only allows users in the previously created Identity Pool
     CognitoAuthorizedRole:
       Type: "AWS::IAM::Role"

@@ -1,6 +1,5 @@
-import { EQueuePriority } from "./enums/queue-priority.enum";
-import { EQueueStatus } from "./enums/queue-status.enum";
-
+import { EQueuePriority } from "../enums/queue-priority.enum";
+import { EQueueStatus } from "../enums/queue-status.enum";
 
 export interface IQueueItem {
   id: string;

@@ -4,8 +4,8 @@ import { ulid } from "ulid";
 import { ServiceItem } from "../../../services/ServiceItem";
 import { EQueuePriority } from "../enums/queue-priority.enum";
 import { EQueueStatus } from "../enums/queue-status.enum";
-import { QueueItem } from "../model/QueueItem";
-import { getQueuePosition } from "../queue";
+import { QueueItem } from "../model/queue-item";
+import { getQueuePosition } from "../get-queue-position";
 import { createMemorableId } from "./create-memorable-id";
 import { TableName } from "../../../table-name";
 

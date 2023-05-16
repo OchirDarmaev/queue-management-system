@@ -13,8 +13,8 @@ import {
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { TableName } from "../table-name";
-import { getItemsByStatus1 } from "../functions/queues/queue";
-import { QueueItem } from "../functions/queues/model/QueueItem";
+import { getItemsBy } from "../functions/boards/get-items-by";
+import { QueueItem } from "../functions/queues/model/queue-item";
 import { ServiceItem } from "../services/ServiceItem";
 import { ServicePointStatus } from "./ServicePointStatus";
 import { IServicePoint } from "./IServicePoint";
@@ -520,7 +520,7 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
   if (servicePoint.currentQueueItem) {
     return;
   }
-  const items = await getItemsByStatus1({
+  const items = await getItemsBy({
     servicePoints: [servicePoint],
     limit: 1,
     queueStatus: EQueueStatus.QUEUED,

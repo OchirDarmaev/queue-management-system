@@ -7,6 +7,7 @@ import middy from "@middy/core";
 import { validate } from "../../../middleware/validate";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import Ajv, { JSONSchemaType } from "ajv";
+import errorLogger from "@middy/error-logger";
 
 interface IGetQueueItem {
   pathParameters: {
@@ -60,4 +61,5 @@ const lambdaHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
 
 export const handler = middy(lambdaHandler)
   .use(validate({ validateEventSchema }))
+  .use(errorLogger())
   .onError(onErrorHandler);

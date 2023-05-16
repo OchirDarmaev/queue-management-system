@@ -5,6 +5,7 @@ import { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from "aws-lambda";
 import { validate } from "../../../middleware/validate";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import Ajv, { JSONSchemaType } from "ajv";
+import errorLogger from "@middy/error-logger";
 
 interface ICreateQueueItem {
   body: {
@@ -48,4 +49,5 @@ const lambdaHandler: APIGatewayProxyHandlerV2 = async (
 export const handler = middy(lambdaHandler)
   .use(jsonBodyParser())
   .use(validate({ validateEventSchema }))
+  .use(errorLogger())
   .onError(onErrorHandler);

@@ -1,6 +1,6 @@
 import { Item } from "../../../baseItem";
 import { ServiceItem } from "../../../services/ServiceItem";
-import { IQueueItem } from "../queue-item.interface";
+import { IQueueItem } from "./queue-item.interface";
 import { EQueuePriority } from "../enums/queue-priority.enum";
 import { EQueueStatus } from "../enums/queue-status.enum";
 
