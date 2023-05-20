@@ -139,15 +139,15 @@ functions:
 
   #Service
   createService:
-    handler: src/services/services.createServiceHandler
+    handler: src/functions/services/create-service/handler.handler
     events:
       - httpApi:
           method: POST
           path: /services
           authorizer:
             name: myAuthorizer
-  getAllServices:
-    handler: src/services/services.getAllServicesHandler
+  getServices:
+    handler: src/functions/services/get-services/handler.handler
     events:
       - httpApi:
           method: GET
@@ -156,7 +156,7 @@ functions:
             name: myAuthorizer
 
   getService:
-    handler: src/services/services.getServiceHandler
+    handler: src/functions/services/get-service/handler.handler
     events:
       - httpApi:
           method: GET
@@ -164,7 +164,7 @@ functions:
           authorizer:
             name: myAuthorizer
   updateService:
-    handler: src/services/services.updateServiceHandler
+    handler: src/functions/services/update-service/handler.handler
     events:
       - httpApi:
           method: PUT
@@ -172,7 +172,7 @@ functions:
           authorizer:
             name: myAuthorizer
   deleteService:
-    handler: src/services/services.deleteServiceHandler
+    handler: src/functions/services/delete-service/handler.handler
     events:
       - httpApi:
           method: DELETE

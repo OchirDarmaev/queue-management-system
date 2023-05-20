@@ -1,6 +1,5 @@
-
-export type IService = {
+export interface IService {
   id: string;
   name: string;
   description: string;
-};
+}

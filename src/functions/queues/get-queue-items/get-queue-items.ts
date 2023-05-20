@@ -1,9 +1,9 @@
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { ddbDocClient } from "../../../ddb-doc-client";
-import { ServiceItem } from "../../../services/ServiceItem";
 import { IQueueItem } from "../model/queue-item.interface";
 import { TableName } from "../../../table-name";
 import { QueueItem } from "../model/queue-item";
+import { ServiceItem } from "../../services/model/service-item";
 
 export async function getQueueItems({
   serviceId,
