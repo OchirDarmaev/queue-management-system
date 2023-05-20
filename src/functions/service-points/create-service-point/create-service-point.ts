@@ -3,18 +3,29 @@ import { IServicePoint } from "../model/service-point.interface";
 import { ServicePointItem } from "../model/service-point-item";
 import { ddbDocClient } from "../../../ddb-doc-client";
 import { TableName } from "../../../table-name";
+import { ulid } from "ulid";
+import { EServicePointStatus } from "../service-point-status.enum";
 
-
-export async function createServicePoint(
-  servicePoint: IServicePoint
-): Promise<IServicePoint> {
-  const servicePointItem = new ServicePointItem(servicePoint);
+export async function createServicePoint(servicePoint: {
+  name: string;
+  description: string;
+  serviceIds?: string[];
+}): Promise<IServicePoint> {
+  const id = ulid();
+  const servicePointItem = new ServicePointItem({
+    id,
+    ...servicePoint,
+    servicePointStatus: EServicePointStatus.DEFAULT,
+  });
+  // todo create service point number
+  // todo validate service ids
 
   await ddbDocClient.send(
     new PutCommand({
       TableName,
       Item: servicePointItem.toItem(),
-      ConditionExpression: "attribute_not_exists(PK) AND attribute_not_exists(SK)",
+      ConditionExpression:
+        "attribute_not_exists(PK) AND attribute_not_exists(SK)",
     })
   );
 

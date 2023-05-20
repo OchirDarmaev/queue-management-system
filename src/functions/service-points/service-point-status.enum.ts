@@ -4,4 +4,5 @@ export enum EServicePointStatus {
   SERVED = "served",
   SKIPPED = "skipped",
   CLOSED = "closed",
+  DEFAULT = CLOSED,
 }

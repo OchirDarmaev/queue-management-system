@@ -5,15 +5,23 @@ import { ddbDocClient } from "../../../ddb-doc-client";
 import { ServiceItem } from "../../../services/ServiceItem";
 import { TableName } from "../../../table-name";
 
+type UpdateServicePointDto = Pick<IServicePoint, "id"> &
+  Partial<
+    Pick<
+      IServicePoint,
+      "name" | "description" | "serviceIds" | "servicePointNumber"
+    >
+  >;
+
 export async function updateServicePoint(
-  servicePoint: Omit<IServicePoint, "servicePointStatus">
+  dto: UpdateServicePointDto
 ): Promise<IServicePoint> {
-  if (servicePoint.serviceIds?.length) {
+  if (dto.serviceIds?.length) {
     const result1 = await ddbDocClient.send(
       new BatchGetCommand({
         RequestItems: {
           [TableName]: {
-            Keys: servicePoint.serviceIds.map((id) => ({
+            Keys: dto.serviceIds.map((id) => ({
               PK: ServiceItem.prefixService,
               SK: ServiceItem.prefixService + id,
             })),
@@ -23,7 +31,7 @@ export async function updateServicePoint(
     );
 
     if (
-      result1?.Responses?.[TableName]?.length !== servicePoint.serviceIds.length
+      result1?.Responses?.[TableName]?.length !== dto.serviceIds.length
     ) {
       throw new Error("Service not found");
     }
@@ -32,20 +40,20 @@ export async function updateServicePoint(
   const result = await ddbDocClient.send(
     new UpdateCommand({
       TableName,
-      Key: new ServicePointItem(servicePoint).keys(),
+      Key: new ServicePointItem(dto).keys(),
       UpdateExpression:
         "SET " +
-        Object.entries(servicePoint)
+        Object.entries(dto)
           .filter(([key, value]) => value !== undefined)
           .map(([key, value]) => `#${key} = :${key}`)
           .join(", "),
-      ExpressionAttributeNames: Object.entries(servicePoint)
+      ExpressionAttributeNames: Object.entries(dto)
         .filter(([key, value]) => value !== undefined)
         .reduce((acc, [key, value]) => {
           acc[`#${key}`] = key;
           return acc;
         }, {}),
-      ExpressionAttributeValues: Object.entries(servicePoint)
+      ExpressionAttributeValues: Object.entries(dto)
 
         .filter(([key, value]) => value !== undefined)
         .reduce((acc, [key, value]) => {

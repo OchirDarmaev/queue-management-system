@@ -1,7 +1,7 @@
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
-import { updateServicePointStatus } from "../update-status-service-point/update-status-service-point";
+import { updateServicePointStatus } from "../update-service-point-status/update-service-point-status";
 import { TableName } from "../../../table-name";
 import { ddbDocClient } from "../../../ddb-doc-client";
 

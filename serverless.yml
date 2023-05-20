@@ -75,7 +75,7 @@ functions:
 
   #ServicePoint
   createServicePoint:
-    handler: src/servicePoints/servicePoints.createServicePointHandler
+    handler: src/functions/service-points/create-service-point/handler.handler
     events:
       - httpApi:
           method: POST
@@ -83,7 +83,7 @@ functions:
           authorizer:
             name: myAuthorizer
   getServicePoint:
-    handler: src/servicePoints/servicePoints.getServicePointHandler
+    handler: src/functions/service-points/get-service-point/handler.handler
     events:
       - httpApi:
           method: GET
@@ -91,7 +91,7 @@ functions:
           authorizer:
             name: myAuthorizer
   getServicePoints:
-    handler: src/servicePoints/servicePoints.getServicePointsHandler
+    handler: src/functions/service-points/get-service-points/handler.handler
     events:
       - httpApi:
           method: GET
@@ -99,7 +99,7 @@ functions:
           authorizer:
             name: myAuthorizer
   updateServicePoint:
-    handler: src/servicePoints/servicePoints.updateServicePointHandler
+    handler: src/functions/service-points/update-service-point/handler.handler
     events:
       - httpApi:
           method: PUT
@@ -107,15 +107,15 @@ functions:
           authorizer:
             name: myAuthorizer
   updateServicePointStatus:
-    handler: src/servicePoints/servicePoints.updateServicePointStatusHandler
+    handler: src/functions/service-points/update-service-point-status/handler.handler
     events:
       - httpApi:
           method: PUT
           path: /servicePoints/{servicePointId}/status/{status}
           authorizer:
             name: myAuthorizer
-  updateServicePointStatusNewItem:
-    handler: src/servicePoints/servicePoints.servicePointStreamHandler
+  processNewQueueItem:
+    handler: src/functions/service-points/update-service-point-status/handler.handler
     events:
       - stream:
           type: dynamodb
@@ -128,8 +128,8 @@ functions:
                   PK:
                     S: [Q#]
 
-  removeServicePoint:
-    handler: src/servicePoints/servicePoints.removeServicePointHandler
+  deleteServicePoint:
+    handler: src/functions/service-points/delete-service-point/handler.handler
     events:
       - httpApi:
           method: DELETE

@@ -1,15 +1,15 @@
+import { DynamoDBStreamHandler } from "aws-lambda";
 import { QueueItem } from "../../queues/model/queue-item";
 import { notifyNewItem } from "./process-new-queue-item";
+import middy from "@middy/core";
+import errorLogger from "@middy/error-logger";
+import { onErrorHandler } from "../../../middleware/on-error-handler";
 
-// dynamodb stream handler DynamoDBStreamHandler
-
-export async function servicePointStreamHandler(event, context) {
-  console.log("event", event);
+const lambdaHandler: DynamoDBStreamHandler = async (event) => {
   const records = event.Records;
   if (!records) {
     return;
   }
-  console.log("records", JSON.stringify(records, null, 2));
 
   for (const record of records) {
     if (record.eventName === "INSERT") {
@@ -19,8 +19,6 @@ export async function servicePointStreamHandler(event, context) {
       }
       const prefix = newImage.PK?.S;
       if (prefix !== QueueItem.prefix) {
-        console.log("prefix is not queue" + prefix);
-
         continue;
       }
       const serviceId = newImage.serviceId?.S;
@@ -30,4 +28,8 @@ export async function servicePointStreamHandler(event, context) {
       await notifyNewItem(serviceId);
     }
   }
-}
+};
+
+export const handler = middy(lambdaHandler)
+  .use(errorLogger())
+  .onError(onErrorHandler);
