@@ -1,7 +1,7 @@
 import { ulid } from "ulid";
-import { Item } from "../../baseItem";
 import { EServicePointStatus } from "../service-point-status.enum";
 import { IServicePoint } from "./service-point.interface";
+import { Item } from "../../../baseItem";
 
 export class ServicePointItem extends Item {
   static prefixServicePoint = "SP#";

@@ -1,10 +1,9 @@
-import { ddbDocClient } from "../../ddb-doc-client";
 import { BatchGetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { TableName } from "../../table-name";
-import { ServiceItem } from "../../services/ServiceItem";
 import { IServicePoint } from "../model/service-point.interface";
 import { ServicePointItem } from "../model/service-point-item";
-
+import { ddbDocClient } from "../../../ddb-doc-client";
+import { ServiceItem } from "../../../services/ServiceItem";
+import { TableName } from "../../../table-name";
 
 export async function updateServicePoint(
   servicePoint: Omit<IServicePoint, "servicePointStatus">
@@ -23,7 +22,9 @@ export async function updateServicePoint(
       })
     );
 
-    if (result1?.Responses?.[TableName]?.length !== servicePoint.serviceIds.length) {
+    if (
+      result1?.Responses?.[TableName]?.length !== servicePoint.serviceIds.length
+    ) {
       throw new Error("Service not found");
     }
   }
@@ -32,7 +33,8 @@ export async function updateServicePoint(
     new UpdateCommand({
       TableName,
       Key: new ServicePointItem(servicePoint).keys(),
-      UpdateExpression: "SET " +
+      UpdateExpression:
+        "SET " +
         Object.entries(servicePoint)
           .filter(([key, value]) => value !== undefined)
           .map(([key, value]) => `#${key} = :${key}`)

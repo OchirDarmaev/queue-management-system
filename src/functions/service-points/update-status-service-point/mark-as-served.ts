@@ -1,13 +1,11 @@
-import { ddbDocClient } from "../../ddb-doc-client";
-import {
-  GetCommand,
-  TransactWriteCommand
-} from "@aws-sdk/lib-dynamodb";
-import { TableName } from "../../table-name";
-import { QueueItem } from "../../functions/queues/model/queue-item";
+import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+
 import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
-import { EQueueStatus } from "../../functions/queues/enums/queue-status.enum";
+import { ddbDocClient } from "../../../ddb-doc-client";
+import { TableName } from "../../../table-name";
+import { EQueueStatus } from "../../queues/enums/queue-status.enum";
+import { QueueItem } from "../../queues/model/queue-item";
 
 export async function markAsServed(servicePoint: ServicePointItem) {
   if (!servicePoint.currentQueueItem) {
@@ -32,7 +30,8 @@ export async function markAsServed(servicePoint: ServicePointItem) {
           Update: {
             TableName: TableName,
             Key: queueItem.keys(),
-            UpdateExpression: "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
+            UpdateExpression:
+              "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
             ExpressionAttributeNames: {
               "#queueStatus": "queueStatus",
               "#date": "date",
@@ -43,19 +42,22 @@ export async function markAsServed(servicePoint: ServicePointItem) {
               ":date": queueItem.date,
               ":GSI1SK": queueItem.GSI1SK,
             },
-            ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK)",
           },
         },
         {
           Update: {
             TableName: TableName,
             Key: servicePoint.keys(),
-            UpdateExpression: "SET currentQueueItem = :currentQueueItem, servicePointStatus = :servicePointStatus ",
+            UpdateExpression:
+              "SET currentQueueItem = :currentQueueItem, servicePointStatus = :servicePointStatus ",
             ExpressionAttributeValues: {
               ":currentQueueItem": "",
               ":servicePointStatus": EServicePointStatus.SERVED,
             },
-            ConditionExpression: "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentQueueItem)",
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentQueueItem)",
           },
         },
       ],

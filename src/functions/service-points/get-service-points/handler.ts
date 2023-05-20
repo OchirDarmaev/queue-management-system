@@ -1,8 +1,7 @@
-import { check } from "../../auth/check";
-import { EAction } from "../../auth/enums/action.enum";
-import { ESubject } from "../../auth/enums/subject.enum";
+import { check } from "../../../auth/check";
+import { EAction } from "../../../auth/enums/action.enum";
+import { ESubject } from "../../../auth/enums/subject.enum";
 import { getServicePoints } from "./get-service-points";
-
 
 export async function getServicePointsHandler(event, context) {
   if (!check(event, EAction.Read, ESubject.ServicePoint)) {

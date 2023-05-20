@@ -1,7 +1,6 @@
-import { check } from "../../auth/check";
-import { EAction } from "../../auth/enums/action.enum";
-import { ESubject } from "../../auth/enums/subject.enum";
-
+import { check } from "../../../auth/check";
+import { EAction } from "../../../auth/enums/action.enum";
+import { ESubject } from "../../../auth/enums/subject.enum";
 
 export async function updateServicePointHandler(event, context) {
   if (!check(event, EAction.Update, ESubject.ServicePoint)) {
@@ -47,7 +46,12 @@ export async function updateServicePointHandler(event, context) {
     };
   }
 }
-function updateServicePoint(arg0: { id: any; serviceIds: any; name: any; description: any; servicePointNumber: any; }) {
+function updateServicePoint(arg0: {
+  id: any;
+  serviceIds: any;
+  name: any;
+  description: any;
+  servicePointNumber: any;
+}) {
   throw new Error("Function not implemented.");
 }
-

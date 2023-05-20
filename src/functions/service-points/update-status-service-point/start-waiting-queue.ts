@@ -1,14 +1,11 @@
-import { ddbDocClient } from "../../ddb-doc-client";
-import {
-  TransactWriteCommand,
-  UpdateCommand
-} from "@aws-sdk/lib-dynamodb";
-import { TableName } from "../../table-name";
-import { getItemsBy } from "../../functions/boards/get-items-by";
+import { TransactWriteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+
 import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
-import { EQueueStatus } from "../../functions/queues/enums/queue-status.enum";
-
+import { ddbDocClient } from "../../../ddb-doc-client";
+import { TableName } from "../../../table-name";
+import { getItemsBy } from "../../boards/get-items-by";
+import { EQueueStatus } from "../../queues/enums/queue-status.enum";
 
 export async function startWaitingQueue(servicePoint: ServicePointItem) {
   if (servicePoint.currentQueueItem) {
@@ -47,7 +44,8 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
           Update: {
             TableName: TableName,
             Key: queueItem.keys(),
-            UpdateExpression: "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
+            UpdateExpression:
+              "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
             ExpressionAttributeNames: {
               "#queueStatus": "queueStatus",
               "#date": "date",
@@ -64,12 +62,14 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
           Update: {
             TableName: TableName,
             Key: servicePoint.keys(),
-            UpdateExpression: "SET currentQueueItem = :currentQueueItem, servicePointStatus = :servicePointStatus",
+            UpdateExpression:
+              "SET currentQueueItem = :currentQueueItem, servicePointStatus = :servicePointStatus",
             ExpressionAttributeValues: {
               ":currentQueueItem": queueItem.id,
               ":servicePointStatus": EServicePointStatus.WAITING,
             },
-            ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK)",
           },
         },
       ],

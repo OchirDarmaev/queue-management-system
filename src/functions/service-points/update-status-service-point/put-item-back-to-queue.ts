@@ -1,13 +1,10 @@
-import { ddbDocClient } from "../../ddb-doc-client";
-import {
-  GetCommand,
-  TransactWriteCommand
-} from "@aws-sdk/lib-dynamodb";
-import { TableName } from "../../table-name";
-import { QueueItem } from "../../functions/queues/model/queue-item";
-import { ServicePointItem } from "../model/service-point-item";
-import { EQueueStatus } from "../../functions/queues/enums/queue-status.enum";
+import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 
+import { ServicePointItem } from "../model/service-point-item";
+import { ddbDocClient } from "../../../ddb-doc-client";
+import { TableName } from "../../../table-name";
+import { EQueueStatus } from "../../queues/enums/queue-status.enum";
+import { QueueItem } from "../../queues/model/queue-item";
 
 export async function putItemBackToQueue(servicePoint: ServicePointItem) {
   if (!servicePoint.currentQueueItem) {
@@ -34,7 +31,8 @@ export async function putItemBackToQueue(servicePoint: ServicePointItem) {
           Update: {
             TableName: TableName,
             Key: queueItem.keys(),
-            UpdateExpression: "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
+            UpdateExpression:
+              "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
             ExpressionAttributeNames: {
               "#queueStatus": "queueStatus",
               "#date": "date",
@@ -55,7 +53,8 @@ export async function putItemBackToQueue(servicePoint: ServicePointItem) {
             ExpressionAttributeValues: {
               ":currentQueueItem": "",
             },
-            ConditionExpression: "attribute_exists(PK) and attribute_exists(SK)",
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK)",
           },
         },
       ],

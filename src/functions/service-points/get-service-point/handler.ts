@@ -1,11 +1,10 @@
-import { check } from "../../auth/check";
-import { EAction } from "../../auth/enums/action.enum";
-import { ESubject } from "../../auth/enums/subject.enum";
-import { deleteServicePoint } from "./delete-service-point";
+import { check } from "../../../auth/check";
+import { EAction } from "../../../auth/enums/action.enum";
+import { ESubject } from "../../../auth/enums/subject.enum";
+import { getServicePoint } from "./get-service-point";
 
-
-export async function removeServicePointHandler(event, context) {
-  if (!check(event, EAction.Delete, ESubject.ServicePoint)) {
+export async function getServicePointHandler(event, context) {
+  if (!check(event, EAction.Read, ESubject.ServicePoint)) {
     return {
       statusCode: 403,
       body: `Forbidden`,
@@ -20,7 +19,7 @@ export async function removeServicePointHandler(event, context) {
         body: "Bad Request",
       };
     }
-    const res = await deleteServicePoint({ id });
+    const res = await getServicePoint({ id });
     return {
       statusCode: 200,
       body: JSON.stringify(res),

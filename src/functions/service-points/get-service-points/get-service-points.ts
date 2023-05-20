@@ -1,8 +1,7 @@
-import { ddbDocClient } from "../../ddb-doc-client";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { ServicePointItem } from "../model/service-point-item";
-import { TableName } from "../../table-name";
-
+import { TableName } from "../../../table-name";
+import { ddbDocClient } from "../../../ddb-doc-client";
 
 export async function getServicePoints() {
   const result = await ddbDocClient.send(

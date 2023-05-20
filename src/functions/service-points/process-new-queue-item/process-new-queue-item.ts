@@ -1,10 +1,9 @@
-import { ddbDocClient } from "../../ddb-doc-client";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
-import { TableName } from "../../table-name";
 import { updateServicePointStatus } from "../update-status-service-point/update-status-service-point";
-
+import { TableName } from "../../../table-name";
+import { ddbDocClient } from "../../../ddb-doc-client";
 
 export async function notifyNewItem(serviceId: string) {
   // get all service point that has this service and servicePointStatus = "waiting" and don't have any item in queue
@@ -12,7 +11,8 @@ export async function notifyNewItem(serviceId: string) {
     new QueryCommand({
       TableName,
       KeyConditionExpression: "PK = :pk and begins_with(SK, :sk)",
-      FilterExpression: "servicePointStatus = :servicePointStatus and contains(serviceIds, :serviceId) and currentQueueItem = :empty",
+      FilterExpression:
+        "servicePointStatus = :servicePointStatus and contains(serviceIds, :serviceId) and currentQueueItem = :empty",
       ExpressionAttributeValues: {
         ":pk": ServicePointItem.prefixServicePoint,
         ":sk": ServicePointItem.prefixServicePoint,

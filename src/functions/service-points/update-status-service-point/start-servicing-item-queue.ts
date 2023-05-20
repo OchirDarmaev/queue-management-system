@@ -1,14 +1,11 @@
-import { ddbDocClient } from "../../ddb-doc-client";
-import {
-  GetCommand,
-  TransactWriteCommand
-} from "@aws-sdk/lib-dynamodb";
-import { TableName } from "../../table-name";
-import { QueueItem } from "../../functions/queues/model/queue-item";
+import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+
 import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
-import { EQueueStatus } from "../../functions/queues/enums/queue-status.enum";
-
+import { ddbDocClient } from "../../../ddb-doc-client";
+import { TableName } from "../../../table-name";
+import { EQueueStatus } from "../../queues/enums/queue-status.enum";
+import { QueueItem } from "../../queues/model/queue-item";
 
 export async function startServicingItemQueue(servicePoint: ServicePointItem) {
   if (!servicePoint.currentQueueItem) {
@@ -34,7 +31,8 @@ export async function startServicingItemQueue(servicePoint: ServicePointItem) {
           Update: {
             TableName: TableName,
             Key: queueItem.keys(),
-            UpdateExpression: "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
+            UpdateExpression:
+              "SET #queueStatus = :queueStatus, #date = :date, #GSI1SK = :GSI1SK",
             ExpressionAttributeNames: {
               "#queueStatus": "queueStatus",
               "#date": "date",
@@ -51,13 +49,15 @@ export async function startServicingItemQueue(servicePoint: ServicePointItem) {
           Update: {
             TableName: TableName,
             Key: servicePoint.keys(),
-            UpdateExpression: "SET servicePointStatus = :servicePointStatus, currentQueueItem = :currentQueueItem",
+            UpdateExpression:
+              "SET servicePointStatus = :servicePointStatus, currentQueueItem = :currentQueueItem",
             ExpressionAttributeValues: {
               ":servicePointStatus": EServicePointStatus.IN_SERVICE,
               ":currentQueueItem": queueItem.id,
             },
 
-            ConditionExpression: "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentQueueItem)",
+            ConditionExpression:
+              "attribute_exists(PK) and attribute_exists(SK) and attribute_exists(currentQueueItem)",
           },
         },
       ],

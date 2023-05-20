@@ -1,10 +1,9 @@
-import { QueueItem } from "../../functions/queues/model/queue-item";
+import { QueueItem } from "../../queues/model/queue-item";
 import { notifyNewItem } from "./process-new-queue-item";
 
 // dynamodb stream handler DynamoDBStreamHandler
 
-export async function servicePointStreamHandler(event,
-  context) {
+export async function servicePointStreamHandler(event, context) {
   console.log("event", event);
   const records = event.Records;
   if (!records) {

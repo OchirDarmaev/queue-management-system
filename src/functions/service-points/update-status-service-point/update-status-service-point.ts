@@ -1,17 +1,18 @@
-import { EServicePointStatus } from "../service-point-status.enum";
 import { IServicePoint } from "../model/service-point.interface";
-import { getServicePoint2 } from "./getServicePoint2";
-import { startWaitingQueue } from "./start-waiting-queue";
+import { EServicePointStatus } from "../service-point-status.enum";
 import { closeServicePoint } from "./close-service-point";
-import { startServicingItemQueue } from "./start-servicing-item-queue";
-import { putItemBackToQueue } from "./put-item-back-to-queue";
 import { markAsServed } from "./mark-as-served";
+import { putItemBackToQueue } from "./put-item-back-to-queue";
+import { startServicingItemQueue } from "./start-servicing-item-queue";
+import { startWaitingQueue } from "./start-waiting-queue";
+import { ServicePointItem } from "../model/service-point-item";
+import { getServicePoint } from "../get-service-point/get-service-point";
 
 export async function updateServicePointStatus({
   id,
   servicePointStatus: newServicePointStatus,
 }: Pick<IServicePoint, "id" | "servicePointStatus">) {
-  const servicePoint = await getServicePoint2(id);
+  const servicePoint = new ServicePointItem(await getServicePoint({ id }));
   console.log("status", servicePoint.servicePointStatus, newServicePointStatus);
   switch (servicePoint.servicePointStatus) {
     case EServicePointStatus.CLOSED:
@@ -52,8 +53,9 @@ export async function updateServicePointStatus({
 
         case EServicePointStatus.WAITING:
           await markAsServed(servicePoint);
-          const servicePoint2 = await getServicePoint2(id);
-          await startWaitingQueue(servicePoint2);
+          await startWaitingQueue(
+            new ServicePointItem(await getServicePoint({ id }))
+          );
           return;
         case EServicePointStatus.IN_SERVICE:
           return;

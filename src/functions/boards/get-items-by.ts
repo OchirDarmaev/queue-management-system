@@ -1,4 +1,3 @@
-import { ServicePointItem } from "../../service-points/model/service-point-item";
 import { EQueueStatus } from "../queues/enums/queue-status.enum";
 import { QueueItem } from "../queues/model/queue-item";
 
@@ -30,6 +29,7 @@ import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { ddbDocClient } from "../../ddb-doc-client";
 import { ServiceItem } from "../../services/ServiceItem";
 import { TableName } from "../../table-name";
+import { ServicePointItem } from "../service-points/model/service-point-item";
 
 async function getQueuedItems({
   serviceId,
