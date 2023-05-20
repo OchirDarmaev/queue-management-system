@@ -1,8 +1,8 @@
 import { BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddbDocClient } from "../../../ddb-doc-client";
 import { TableName } from "../../../table-name";
-import { ServicePointItem } from "../../../servicePoints/ServicePointItem";
-import { ServicePointStatus } from "../../../servicePoints/ServicePointStatus";
+import { ServicePointItem } from "../../../servicePoints/model/service-point-item";
+import { EServicePointStatus } from "../../../servicePoints/service-point-status.enum";
 import { EQueueStatus } from "../../queues/enums/queue-status.enum";
 import { getItemsBy } from "../get-items-by";
 import { QueueItem } from "../../queues/model/queue-item";
@@ -27,8 +27,8 @@ export async function getBoardStatus({
 
   const servicePointIsInProgress = servicePoints.filter(
     (x) =>
-      x.servicePointStatus === ServicePointStatus.IN_SERVICE ||
-      (x.servicePointStatus === ServicePointStatus.WAITING &&
+      x.servicePointStatus === EServicePointStatus.IN_SERVICE ||
+      (x.servicePointStatus === EServicePointStatus.WAITING &&
         x.currentQueueItem)
   );
 
