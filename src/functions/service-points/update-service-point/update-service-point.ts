@@ -2,8 +2,8 @@ import { BatchGetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { IServicePoint } from "../model/service-point.interface";
 import { ServicePointItem } from "../model/service-point-item";
 import { ddbDocClient } from "../../../ddb-doc-client";
-import { ServiceItem } from "../../../services/ServiceItem";
 import { TableName } from "../../../table-name";
+import { ServiceItem } from "../../services/model/service-item";
 
 type UpdateServicePointDto = Pick<IServicePoint, "id"> &
   Partial<
@@ -30,9 +30,7 @@ export async function updateServicePoint(
       })
     );
 
-    if (
-      result1?.Responses?.[TableName]?.length !== dto.serviceIds.length
-    ) {
+    if (result1?.Responses?.[TableName]?.length !== dto.serviceIds.length) {
       throw new Error("Service not found");
     }
   }
@@ -68,5 +66,5 @@ export async function updateServicePoint(
     throw new Error("Service point not found 2");
   }
 
-  return new ServicePointItem(result.Attributes);
+  return ServicePointItem.fromItem(result.Attributes);
 }

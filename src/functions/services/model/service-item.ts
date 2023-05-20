@@ -1,6 +1,5 @@
-import { Item } from "../baseItem";
-import { IService } from "./IService";
-
+import { Item } from "../../../baseItem";
+import { IService } from "./service.interface";
 
 export class ServiceItem extends Item implements IService {
   static prefixService = "S#";

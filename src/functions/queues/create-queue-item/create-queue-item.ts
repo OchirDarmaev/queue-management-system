@@ -1,13 +1,13 @@
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { ddbDocClient } from "../../../ddb-doc-client";
 import { ulid } from "ulid";
-import { ServiceItem } from "../../../services/ServiceItem";
 import { EQueuePriority } from "../enums/queue-priority.enum";
 import { EQueueStatus } from "../enums/queue-status.enum";
 import { QueueItem } from "../model/queue-item";
 import { createMemorableId } from "./create-memorable-id";
 import { TableName } from "../../../table-name";
 import { getQueuePosition } from "../get-queue-item/get-queue-position";
+import { ServiceItem } from "../../services/model/service-item";
 
 export async function createQueueItem({
   serviceId,
