@@ -12,10 +12,11 @@ export async function createServicePoint(servicePoint: {
   serviceIds?: string[];
 }): Promise<IServicePoint> {
   const id = ulid();
+  const defaultStatus = EServicePointStatus.CLOSED;
   const servicePointItem = new ServicePointItem({
     id,
     ...servicePoint,
-    servicePointStatus: EServicePointStatus.DEFAULT,
+    servicePointStatus: defaultStatus,
   });
   // todo create service point number
   // todo validate service ids
