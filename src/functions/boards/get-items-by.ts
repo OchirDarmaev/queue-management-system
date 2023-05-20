@@ -1,4 +1,4 @@
-import { ServicePointItem } from "../../servicePoints/model/service-point-item";
+import { ServicePointItem } from "../../service-points/model/service-point-item";
 import { EQueueStatus } from "../queues/enums/queue-status.enum";
 import { QueueItem } from "../queues/model/queue-item";
 

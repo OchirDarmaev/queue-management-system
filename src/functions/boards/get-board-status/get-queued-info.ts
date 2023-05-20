@@ -1,4 +1,4 @@
-import { getServicePoints } from "../../../servicePoints/get-service-points/get-service-points";
+import { getServicePoints } from "../../../service-points/get-service-points/get-service-points";
 import { getBoardStatus } from "./get-board-status";
 
 export async function getQueuedInfo() {

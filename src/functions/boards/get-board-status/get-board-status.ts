@@ -1,8 +1,8 @@
 import { BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 import { ddbDocClient } from "../../../ddb-doc-client";
 import { TableName } from "../../../table-name";
-import { ServicePointItem } from "../../../servicePoints/model/service-point-item";
-import { EServicePointStatus } from "../../../servicePoints/service-point-status.enum";
+import { ServicePointItem } from "../../../service-points/model/service-point-item";
+import { EServicePointStatus } from "../../../service-points/service-point-status.enum";
 import { EQueueStatus } from "../../queues/enums/queue-status.enum";
 import { getItemsBy } from "../get-items-by";
 import { QueueItem } from "../../queues/model/queue-item";
