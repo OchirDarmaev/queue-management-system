@@ -3,54 +3,13 @@ import errorLogger from "@middy/error-logger";
 import jsonBodyParser from "@middy/http-json-body-parser";
 import Ajv, { JSONSchemaType } from "ajv";
 import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
-import { check } from "../../../auth/check";
-import { EAction } from "../../../auth/enums/action.enum";
-import { ESubject } from "../../../auth/enums/subject.enum";
+import { check } from "../../../middleware/auth/check";
+import { EAction } from "../../../middleware/auth/enums/action.enum";
+import { ESubject } from "../../../middleware/auth/enums/subject.enum";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import { EServicePointStatus } from "../service-point-status.enum";
 import { updateServicePointStatus } from "./update-service-point-status";
 import { validate } from "../../../middleware/validate";
-
-// export async function updateServicePointStatusHandler(event, context) {
-//   if (!check(event, EAction.UpdateStatus, ESubject.ServicePoint)) {
-//     return {
-//       statusCode: 403,
-//       body: `Forbidden`,
-//     };
-//   }
-
-//   try {
-//     const id = event.pathParameters?.servicePointId;
-//     if (!id) {
-//       return {
-//         statusCode: 400,
-//         body: "Bad Request",
-//       };
-//     }
-//     const status = event.pathParameters?.status as EServicePointStatus;
-//     if (!status) {
-//       return {
-//         statusCode: 400,
-//         body: "Bad Request",
-//       };
-//     }
-
-//     const res = await updateServicePointStatus({
-//       id,
-//       servicePointStatus: status,
-//     });
-//     return {
-//       statusCode: 200,
-//       body: JSON.stringify(res),
-//     };
-//   } catch (error) {
-//     console.error(error);
-//     return {
-//       statusCode: 500,
-//       body: "Internal Server Error",
-//     };
-//   }
-// }
 
 interface IUpdateServicePointStatus {
   pathParameters: {
@@ -92,7 +51,7 @@ const validateEventSchema = new Ajv().compile(schema);
 const lambdaHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
   event
 ) => {
-  if (!check(event, EAction.UpdateStatus, ESubject.ServicePoint)) {
+  if (!check(event, EAction.UpdateServicePointStatus, ESubject.ServicePoints)) {
     return {
       statusCode: 403,
       body: `Forbidden`,

@@ -2,9 +2,9 @@ import middy from "@middy/core";
 import errorLogger from "@middy/error-logger";
 import Ajv, { JSONSchemaType } from "ajv";
 import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
-import { check } from "../../../auth/check";
-import { EAction } from "../../../auth/enums/action.enum";
-import { ESubject } from "../../../auth/enums/subject.enum";
+import { check } from "../../../middleware/auth/check";
+import { EAction } from "../../../middleware/auth/enums/action.enum";
+import { ESubject } from "../../../middleware/auth/enums/subject.enum";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import { getServicePoint } from "./get-service-point";
 import { validate } from "../../../middleware/validate";
@@ -38,7 +38,7 @@ const validateEventSchema = new Ajv().compile(schema);
 const lambdaHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
   event
 ) => {
-  if (!check(event, EAction.Read, ESubject.ServicePoint)) {
+  if (!check(event, EAction.Read, ESubject.ServicePoints)) {
     return {
       statusCode: 403,
       body: `Forbidden`,

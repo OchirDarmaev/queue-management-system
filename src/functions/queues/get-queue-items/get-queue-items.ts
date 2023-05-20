@@ -1,5 +1,5 @@
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { ddbDocClient } from "../../../ddb-doc-client";
+import { ddbDocClient } from "../../../dynamo-DB-client";
 import { IQueueItem } from "../model/queue-item.interface";
 import { TableName } from "../../../table-name";
 import { QueueItem } from "../model/queue-item";

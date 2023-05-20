@@ -2,7 +2,7 @@ import { ulid } from "ulid";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { IService } from "../model/service.interface.js";
 import { ServiceItem } from "../model/service-item.js";
-import { ddbDocClient } from "../../../ddb-doc-client.js";
+import { ddbDocClient } from "../../../dynamo-DB-client.js";
 import { TableName } from "../../../table-name.js";
 
 export async function createService({

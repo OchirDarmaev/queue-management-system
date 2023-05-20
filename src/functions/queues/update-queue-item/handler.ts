@@ -1,7 +1,4 @@
 import Ajv, { JSONSchemaType } from "ajv";
-import { check } from "../../../auth/check";
-import { EAction } from "../../../auth/enums/action.enum";
-import { ESubject } from "../../../auth/enums/subject.enum";
 import { EQueuePriority } from "../enums/queue-priority.enum";
 import { updateQueueItem } from "./update-queue-item";
 import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
@@ -10,6 +7,9 @@ import jsonBodyParser from "@middy/http-json-body-parser";
 import { validate } from "../../../middleware/validate";
 import errorLogger from "@middy/error-logger";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
+import { check } from "../../../middleware/auth/check";
+import { EAction } from "../../../middleware/auth/enums/action.enum";
+import { ESubject } from "../../../middleware/auth/enums/subject.enum";
 
 interface IUpdateQueueItem {
   body: {
@@ -53,7 +53,7 @@ const validateEventSchema = new Ajv().compile(schema);
 const lambdaHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
   event
 ) => {
-  if (!check(event, EAction.Update, ESubject.QueueItem)) {
+  if (!check(event, EAction.Update, ESubject.Queues)) {
     return {
       statusCode: 403,
       body: `Forbidden`,

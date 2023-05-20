@@ -48,31 +48,6 @@ provider:
           Resource:
             - "arn:aws:iot:${opt:region, self:provider.region}:*:topic/${self:service}/${sls:stage}/*"
 functions:
-  #test
-  testProtected:
-    handler: src/test/test.handlerProtected
-    events:
-      - httpApi:
-          method: GET
-          path: /test/protected
-          authorizer:
-            name: myAuthorizer
-  testProtected2:
-    handler: src/test/test.handlerProtected
-    events:
-      - httpApi:
-          method: GET
-          path: /test/protected2
-          authorizer:
-            name: myAuthorizer
-
-  testPublic:
-    handler: src/test/test.handlerPublic
-    events:
-      - httpApi:
-          method: GET
-          path: /test/public
-
   #ServicePoint
   createServicePoint:
     handler: src/functions/service-points/create-service-point/handler.handler

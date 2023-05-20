@@ -2,7 +2,7 @@ import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { IServicePoint } from "../model/service-point.interface";
 import { ServicePointItem } from "../model/service-point-item";
 import { TableName } from "../../../table-name";
-import { ddbDocClient } from "../../../ddb-doc-client";
+import { ddbDocClient } from "../../../dynamo-DB-client";
 
 export async function deleteServicePoint(
   servicePoint: Pick<IServicePoint, "id">

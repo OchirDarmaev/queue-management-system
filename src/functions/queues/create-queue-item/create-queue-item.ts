@@ -1,5 +1,5 @@
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
-import { ddbDocClient } from "../../../ddb-doc-client";
+import { ddbDocClient } from "../../../dynamo-DB-client";
 import { ulid } from "ulid";
 import { EQueuePriority } from "../enums/queue-priority.enum";
 import { EQueueStatus } from "../enums/queue-status.enum";

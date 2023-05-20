@@ -1,8 +1,8 @@
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
-import { ddbDocClient } from "../../../ddb-doc-client";
 import { QueueItem } from "../model/queue-item";
 import { getQueuePosition } from "./get-queue-position";
 import { TableName } from "../../../table-name";
+import { ddbDocClient } from "../../../dynamo-DB-client";
 
 export async function getQueueItem({ queueId }: { queueId: string }): Promise<{
   item: QueueItem;

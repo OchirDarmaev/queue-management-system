@@ -5,9 +5,9 @@ import { ESubject } from "./enums/subject.enum";
 
 export const rulesByRole: RulesByRole = {
   [ERole.Admin]: [
-    { action: EAction.Manage, subject: ESubject.ServicePoint },
+    { action: EAction.Manage, subject: ESubject.ServicePoints },
     { action: EAction.Manage, subject: ESubject.Services },
-    { action: EAction.Manage, subject: ESubject.QueueItem },
+    { action: EAction.Manage, subject: ESubject.Queues },
   ],
   [ERole.Specialist]: [],
   [ERole.User]: [],

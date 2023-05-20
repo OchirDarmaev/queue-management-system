@@ -1,5 +1,5 @@
 import { UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
-import { ddbDocClient } from "../../../ddb-doc-client";
+import { ddbDocClient } from "../../../dynamo-DB-client";
 import { TableName } from "../../../table-name";
 import createError from "http-errors";
 import { ServiceItem } from "../../services/model/service-item";

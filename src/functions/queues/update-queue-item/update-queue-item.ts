@@ -1,9 +1,9 @@
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { ddbDocClient } from "../../../ddb-doc-client";
 import { EQueuePriority } from "../enums/queue-priority.enum";
 import { QueueItem } from "../model/queue-item";
 import { getQueueItem } from "../get-queue-item/get-queue-item";
 import { TableName } from "../../../table-name";
+import { ddbDocClient } from "../../../dynamo-DB-client";
 
 
 export async function updateQueueItem({

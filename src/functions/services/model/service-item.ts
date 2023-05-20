@@ -1,4 +1,4 @@
-import { Item } from "../../../baseItem";
+import { Item } from "../../../item";
 import { IService } from "./service.interface";
 
 export class ServiceItem extends Item implements IService {

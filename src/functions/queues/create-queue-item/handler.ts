@@ -1,11 +1,14 @@
 import middy from "@middy/core";
 import { createQueueItem } from "./create-queue-item";
 import jsonBodyParser from "@middy/http-json-body-parser";
-import { APIGatewayProxyEventV2, APIGatewayProxyHandlerV2 } from "aws-lambda";
+import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
 import { validate } from "../../../middleware/validate";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import Ajv, { JSONSchemaType } from "ajv";
 import errorLogger from "@middy/error-logger";
+import { check } from "../../../middleware/auth/check";
+import { EAction } from "../../../middleware/auth/enums/action.enum";
+import { ESubject } from "../../../middleware/auth/enums/subject.enum";
 
 interface ICreateQueueItem {
   body: {
@@ -32,9 +35,16 @@ const schema: JSONSchemaType<ICreateQueueItem> = {
 };
 const validateEventSchema = new Ajv().compile(schema);
 
-const lambdaHandler: APIGatewayProxyHandlerV2 = async (
-  event: APIGatewayProxyEventV2
+const lambdaHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
+  event
 ) => {
+  if (!check(event, EAction.Create, ESubject.Queues)) {
+    return {
+      statusCode: 403,
+      body: `Forbidden`,
+    };
+  }
+
   const payload = event as unknown as ICreateQueueItem;
   const res = await createQueueItem({ serviceId: payload.body.serviceId });
   return {

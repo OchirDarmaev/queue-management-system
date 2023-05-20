@@ -1,6 +1,6 @@
 import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { ServiceItem } from "../model/service-item.js";
-import { ddbDocClient } from "../../../ddb-doc-client.js";
+import { ddbDocClient } from "../../../dynamo-DB-client.js";
 import { TableName } from "../../../table-name.js";
 
 export async function deleteService({ id }: { id: string }) {

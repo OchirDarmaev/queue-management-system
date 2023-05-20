@@ -1,12 +1,13 @@
 import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
-import { check } from "../../../auth/check";
-import { EAction } from "../../../auth/enums/action.enum";
-import { ESubject } from "../../../auth/enums/subject.enum";
+
 import { getQueueItems } from "./get-queue-items";
 import middy from "@middy/core";
 import { validate } from "../../../middleware/validate";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import Ajv, { JSONSchemaType } from "ajv";
+import { check } from "../../../middleware/auth/check";
+import { EAction } from "../../../middleware/auth/enums/action.enum";
+import { ESubject } from "../../../middleware/auth/enums/subject.enum";
 
 interface IGetQueueItems {
   pathParameters: {
@@ -37,7 +38,7 @@ const validateEventSchema = new Ajv().compile(schema);
 const lambdaHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
   event
 ) => {
-  if (!check(event, EAction.Read, ESubject.QueueItem)) {
+  if (!check(event, EAction.Read, ESubject.Queues)) {
     return {
       statusCode: 403,
       body: `Forbidden`,

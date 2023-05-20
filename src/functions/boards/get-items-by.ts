@@ -1,7 +1,7 @@
 import { EQueueStatus } from "../queues/enums/queue-status.enum";
 import { QueueItem } from "../queues/model/queue-item";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { ddbDocClient } from "../../ddb-doc-client";
+import { ddbDocClient } from "../../dynamo-DB-client";
 import { TableName } from "../../table-name";
 import { ServicePointItem } from "../service-points/model/service-point-item";
 import { ServiceItem } from "../services/model/service-item";

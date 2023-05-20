@@ -2,7 +2,7 @@ import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 
 import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
-import { ddbDocClient } from "../../../ddb-doc-client";
+import { ddbDocClient } from "../../../dynamo-DB-client";
 import { TableName } from "../../../table-name";
 import { EQueueStatus } from "../../queues/enums/queue-status.enum";
 import { QueueItem } from "../../queues/model/queue-item";

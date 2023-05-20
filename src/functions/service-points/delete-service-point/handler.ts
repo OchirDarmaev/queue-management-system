@@ -1,7 +1,7 @@
 import Ajv, { JSONSchemaType } from "ajv";
-import { check } from "../../../auth/check";
-import { EAction } from "../../../auth/enums/action.enum";
-import { ESubject } from "../../../auth/enums/subject.enum";
+import { check } from "../../../middleware/auth/check";
+import { EAction } from "../../../middleware/auth/enums/action.enum";
+import { ESubject } from "../../../middleware/auth/enums/subject.enum";
 import { deleteServicePoint } from "./delete-service-point";
 import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
 import { validate } from "../../../middleware/validate";
@@ -38,7 +38,7 @@ const validateEventSchema = new Ajv().compile(schema);
 const lambdaHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
   event
 ) => {
-  if (!check(event, EAction.Delete, ESubject.ServicePoint)) {
+  if (!check(event, EAction.Delete, ESubject.ServicePoints)) {
     return {
       statusCode: 403,
       body: `Forbidden`,

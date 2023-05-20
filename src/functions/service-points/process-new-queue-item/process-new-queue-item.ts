@@ -3,7 +3,7 @@ import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
 import { updateServicePointStatus } from "../update-service-point-status/update-service-point-status";
 import { TableName } from "../../../table-name";
-import { ddbDocClient } from "../../../ddb-doc-client";
+import { ddbDocClient } from "../../../dynamo-DB-client";
 
 export async function notifyNewItem(serviceId: string) {
   // get all service point that has this service and servicePointStatus = "waiting" and don't have any item in queue

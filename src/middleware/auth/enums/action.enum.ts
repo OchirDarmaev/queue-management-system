@@ -7,5 +7,5 @@ export enum EAction {
   Read = "read",
   Update = "update",
   Delete = "delete",
-  UpdateStatus = "UpdateStatus"
+  UpdateServicePointStatus = "update-service-point-status"
 }
