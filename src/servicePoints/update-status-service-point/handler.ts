@@ -2,7 +2,7 @@ import { EServicePointStatus } from "../service-point-status.enum";
 import { check } from "../../auth/check";
 import { EAction } from "../../auth/enums/action.enum";
 import { ESubject } from "../../auth/enums/subject.enum";
-import { updateServicePointStatus } from "./updateServicePointStatus";
+import { updateServicePointStatus } from "./update-status-service-point";
 
 export async function updateServicePointStatusHandler(event, context) {
   if (!check(event, EAction.UpdateStatus, ESubject.ServicePoint)) {

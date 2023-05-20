@@ -3,7 +3,7 @@ import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
 import { TableName } from "../../table-name";
-import { updateServicePointStatus } from "../update-status-service-point/updateServicePointStatus";
+import { updateServicePointStatus } from "../update-status-service-point/update-status-service-point";
 
 
 export async function notifyNewItem(serviceId: string) {

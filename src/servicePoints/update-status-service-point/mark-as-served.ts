@@ -9,7 +9,6 @@ import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
 import { EQueueStatus } from "../../functions/queues/enums/queue-status.enum";
 
-
 export async function markAsServed(servicePoint: ServicePointItem) {
   if (!servicePoint.currentQueueItem) {
     throw new Error("Queue item not defined");

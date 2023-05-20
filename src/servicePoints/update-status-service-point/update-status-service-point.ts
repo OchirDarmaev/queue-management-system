@@ -1,11 +1,11 @@
 import { EServicePointStatus } from "../service-point-status.enum";
 import { IServicePoint } from "../model/service-point.interface";
 import { getServicePoint2 } from "./getServicePoint2";
-import { startWaitingQueue } from "./startWaitingQueue";
-import { closeServicePoint } from "./closeServicePoint";
-import { startServicingItemQueue } from "./startServicingItemQueue";
-import { putItemBackToQueue } from "./putItemBackToQueue";
-import { markAsServed } from "./markAsServed";
+import { startWaitingQueue } from "./start-waiting-queue";
+import { closeServicePoint } from "./close-service-point";
+import { startServicingItemQueue } from "./start-servicing-item-queue";
+import { putItemBackToQueue } from "./put-item-back-to-queue";
+import { markAsServed } from "./mark-as-served";
 
 export async function updateServicePointStatus({
   id,

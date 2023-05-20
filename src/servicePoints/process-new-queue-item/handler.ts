@@ -1,5 +1,5 @@
 import { QueueItem } from "../../functions/queues/model/queue-item";
-import { notifyNewItem } from "./notifyNewItem";
+import { notifyNewItem } from "./process-new-queue-item";
 
 // dynamodb stream handler DynamoDBStreamHandler
 

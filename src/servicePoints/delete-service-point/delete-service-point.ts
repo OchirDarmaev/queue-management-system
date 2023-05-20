@@ -4,7 +4,6 @@ import { IServicePoint } from "../model/service-point.interface";
 import { ServicePointItem } from "../model/service-point-item";
 import { TableName } from "../../table-name";
 
-
 export async function deleteServicePoint(
   servicePoint: Pick<IServicePoint, "id">
 ) {

@@ -1,10 +1,10 @@
 import { check } from "../../auth/check";
 import { EAction } from "../../auth/enums/action.enum";
 import { ESubject } from "../../auth/enums/subject.enum";
-import { getServicePoint } from "./getServicePoint";
+import { getServicePoints } from "./get-service-points";
 
 
-export async function getServicePointHandler(event, context) {
+export async function getServicePointsHandler(event, context) {
   if (!check(event, EAction.Read, ESubject.ServicePoint)) {
     return {
       statusCode: 403,
@@ -13,18 +13,8 @@ export async function getServicePointHandler(event, context) {
   }
 
   try {
-    const id = event.pathParameters?.servicePointId;
-    if (!id) {
-      return {
-        statusCode: 400,
-        body: "Bad Request",
-      };
-    }
-    const res = await getServicePoint({ id });
-    return {
-      statusCode: 200,
-      body: JSON.stringify(res),
-    };
+    const res = await getServicePoints();
+    return res;
   } catch (error) {
     console.error(error);
     return {

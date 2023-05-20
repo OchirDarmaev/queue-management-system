@@ -2,7 +2,7 @@ import { EServicePointStatus } from "../service-point-status.enum";
 import { check } from "../../auth/check";
 import { EAction } from "../../auth/enums/action.enum";
 import { ESubject } from "../../auth/enums/subject.enum";
-import { createServicePoint } from "./createServicePoint";
+import { createServicePoint } from "./create-service-point";
 
 
 export async function createServicePointHandler(event, context) {

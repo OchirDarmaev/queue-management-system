@@ -4,7 +4,6 @@ import { EServicePointStatus } from "../service-point-status.enum";
 import { ServicePointItem } from "../model/service-point-item";
 import { TableName } from "../../table-name";
 
-
 export async function closeServicePoint(servicePoint: ServicePointItem) {
   await ddbDocClient.send(
     new UpdateCommand({
