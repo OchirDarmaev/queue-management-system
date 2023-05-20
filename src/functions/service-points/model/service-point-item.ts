@@ -1,8 +1,7 @@
 import { ulid } from "ulid";
-import { Item } from "../baseItem";
-import { ServicePointStatus } from "./ServicePointStatus";
-import { IServicePoint } from "./IServicePoint";
-
+import { EServicePointStatus } from "../service-point-status.enum";
+import { IServicePoint } from "./service-point.interface";
+import { Item } from "../../../baseItem";
 
 export class ServicePointItem extends Item {
   static prefixServicePoint = "SP#";
@@ -10,7 +9,7 @@ export class ServicePointItem extends Item {
   public serviceIds: string[];
   public name: string;
   public description: string;
-  public servicePointStatus: ServicePointStatus;
+  public servicePointStatus: EServicePointStatus;
   public currentQueueItem: string;
   public servicePointNumber: string;
   constructor(servicePoint: Partial<IServicePoint>) {
@@ -20,7 +19,7 @@ export class ServicePointItem extends Item {
     this.name = servicePoint.name || "";
     this.description = servicePoint.description || "";
     this.servicePointStatus =
-      servicePoint.servicePointStatus || ServicePointStatus.CLOSED;
+      servicePoint.servicePointStatus || EServicePointStatus.CLOSED;
     this.currentQueueItem = servicePoint.currentQueueItem || "";
     this.servicePointNumber = servicePoint.servicePointNumber || "";
   }
@@ -39,7 +38,7 @@ export class ServicePointItem extends Item {
       serviceIds: item.serviceIds as string[],
       name: item.name as string,
       description: item.description as string,
-      servicePointStatus: item.servicePointStatus as ServicePointStatus,
+      servicePointStatus: item.servicePointStatus as EServicePointStatus,
       currentQueueItem: item.currentQueueItem as string,
       servicePointNumber: item.servicePointNumber as string,
     });

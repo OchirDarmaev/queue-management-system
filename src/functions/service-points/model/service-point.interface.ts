@@ -1,12 +1,11 @@
-import { ServicePointStatus } from "./ServicePointStatus";
-
+import { EServicePointStatus } from "../service-point-status.enum";
 
 export type IServicePoint = {
   id: string;
   serviceIds: string[];
   name: string;
   description: string;
-  servicePointStatus: ServicePointStatus;
+  servicePointStatus: EServicePointStatus;
   currentQueueItem?: string;
   servicePointNumber: string;
 };
