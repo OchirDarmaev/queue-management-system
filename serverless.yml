@@ -86,7 +86,7 @@ functions:
     events:
       - httpApi:
           method: PUT
-          path: /servicePoints/{servicePointId}/status/{status}
+          path: /servicePoints/{servicePointId}/status
           authorizer:
             name: myAuthorizer
   processNewQueueItem:
