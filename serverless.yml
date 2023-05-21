@@ -90,7 +90,7 @@ functions:
           authorizer:
             name: myAuthorizer
   processNewQueueItem:
-    handler: src/functions/service-points/update-service-point-status/handler.handler
+    handler: src/functions/service-points/process-new-queue-item/handler.handler
     events:
       - stream:
           type: dynamodb
