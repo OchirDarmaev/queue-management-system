@@ -180,14 +180,6 @@ functions:
           path: "/services/{serviceId}/queue"
           authorizer:
             name: myAuthorizer
-  updateQueueItem:
-    handler: src/functions/queues/update-queue-item/handler.handler
-    events:
-      - httpApi:
-          method: PUT
-          path: "/queues/{queueId}"
-          authorizer:
-            name: myAuthorizer
 
   #Board
   getQueueStatus:
