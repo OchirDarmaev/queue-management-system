@@ -8,6 +8,7 @@ import Ajv, { JSONSchemaType } from "ajv";
 import { check } from "../../../middleware/auth/check";
 import { EAction } from "../../../middleware/auth/enums/action.enum";
 import { ESubject } from "../../../middleware/auth/enums/subject.enum";
+import { ulidLength } from "../../../ulid-length";
 
 interface IGetQueueItems {
   pathParameters: {
@@ -24,8 +25,8 @@ const schema: JSONSchemaType<IGetQueueItems> = {
       properties: {
         serviceId: {
           type: "string",
-          minLength: 26,
-          maxLength: 26,
+          minLength: ulidLength,
+          maxLength: ulidLength,
         },
       },
       required: ["serviceId"],

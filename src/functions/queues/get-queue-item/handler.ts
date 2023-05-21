@@ -8,6 +8,7 @@ import errorLogger from "@middy/error-logger";
 import { EAction } from "../../../middleware/auth/enums/action.enum";
 import { check } from "../../../middleware/auth/check";
 import { ESubject } from "../../../middleware/auth/enums/subject.enum";
+import { ulidLength } from "../../../ulid-length";
 
 interface IGetQueueItem {
   pathParameters: {
@@ -24,8 +25,8 @@ const schema: JSONSchemaType<IGetQueueItem> = {
       properties: {
         queueId: {
           type: "string",
-          minLength: 26,
-          maxLength: 26,
+          minLength: ulidLength,
+          maxLength: ulidLength,
         },
       },
       required: ["queueId"],

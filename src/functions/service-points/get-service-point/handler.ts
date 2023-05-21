@@ -8,6 +8,7 @@ import { ESubject } from "../../../middleware/auth/enums/subject.enum";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import { getServicePoint } from "./get-service-point";
 import { validate } from "../../../middleware/validate";
+import { ulidLength } from "../../../ulid-length";
 
 interface IGetServicePoint {
   pathParameters: {
@@ -24,8 +25,8 @@ const schema: JSONSchemaType<IGetServicePoint> = {
       properties: {
         servicePointId: {
           type: "string",
-          minLength: 26,
-          maxLength: 26,
+          minLength: ulidLength,
+          maxLength: ulidLength,
         },
       },
       required: ["servicePointId"],

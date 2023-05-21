@@ -9,6 +9,7 @@ import errorLogger from "@middy/error-logger";
 import { check } from "../../../middleware/auth/check";
 import { EAction } from "../../../middleware/auth/enums/action.enum";
 import { ESubject } from "../../../middleware/auth/enums/subject.enum";
+import { ulidLength } from "../../../ulid-length";
 
 interface ICreateQueueItem {
   body: {
@@ -25,8 +26,8 @@ const schema: JSONSchemaType<ICreateQueueItem> = {
       properties: {
         serviceId: {
           type: "string",
-          minLength: 26,
-          maxLength: 26,
+          minLength: ulidLength,
+          maxLength: ulidLength,
         },
       },
       required: ["serviceId"],

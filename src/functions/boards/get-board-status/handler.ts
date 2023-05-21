@@ -1,6 +1,7 @@
 import { APIGatewayProxyHandlerV2WithJWTAuthorizer } from "aws-lambda";
 import { getQueuedInfo } from "./get-queued-info";
 import middy from "@middy/core";
+import cors from "@middy/http-cors";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import errorLogger from "@middy/error-logger";
 import { EAction } from "../../../middleware/auth/enums/action.enum";
@@ -28,5 +29,10 @@ const lambdaHandler: APIGatewayProxyHandlerV2WithJWTAuthorizer = async (
 };
 
 export const handler = middy(lambdaHandler)
+  .use(
+    cors({
+      origin: "*",
+    })
+  )
   .use(errorLogger())
   .onError(onErrorHandler);

@@ -8,6 +8,7 @@ import { validate } from "../../../middleware/validate";
 import errorLogger from "@middy/error-logger";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import middy from "@middy/core";
+import { ulidLength } from "../../../ulid-length";
 
 interface IDeleteServicePoint {
   pathParameters: {
@@ -24,8 +25,8 @@ const schema: JSONSchemaType<IDeleteServicePoint> = {
       properties: {
         servicePointId: {
           type: "string",
-          minLength: 26,
-          maxLength: 26,
+          minLength: ulidLength,
+          maxLength: ulidLength,
         },
       },
       required: ["servicePointId"],

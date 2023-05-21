@@ -8,6 +8,7 @@ import { validate } from "../../../middleware/validate";
 import errorLogger from "@middy/error-logger";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
 import Ajv, { JSONSchemaType } from "ajv";
+import { ulidLength } from "../../../ulid-length";
 interface IUpdateServicePoint {
   pathParameters: {
     servicePointId: string;
@@ -29,8 +30,8 @@ const schema: JSONSchemaType<IUpdateServicePoint> = {
       properties: {
         servicePointId: {
           type: "string",
-          minLength: 26,
-          maxLength: 26,
+          minLength: ulidLength,
+          maxLength: ulidLength,
         },
       },
       required: ["servicePointId"],
@@ -42,8 +43,8 @@ const schema: JSONSchemaType<IUpdateServicePoint> = {
           type: "array",
           items: {
             type: "string",
-            minLength: 26,
-            maxLength: 26,
+            minLength: ulidLength,
+            maxLength: ulidLength,
           },
           nullable: true,
         },

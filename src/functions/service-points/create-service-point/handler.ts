@@ -9,6 +9,7 @@ import jsonBodyParser from "@middy/http-json-body-parser";
 import { validate } from "../../../middleware/validate";
 import errorLogger from "@middy/error-logger";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
+import { ulidLength } from "../../../ulid-length";
 
 interface ICreateServicePoint {
   body: {
@@ -39,8 +40,8 @@ const schema: JSONSchemaType<ICreateServicePoint> = {
           type: "array",
           items: {
             type: "string",
-            minLength: 26,
-            maxLength: 26,
+            minLength: ulidLength,
+            maxLength: ulidLength,
           },
           nullable: true,
         },
