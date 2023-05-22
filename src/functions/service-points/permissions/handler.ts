@@ -1,9 +1,9 @@
 import {
   IoTClient,
   CreatePolicyCommand,
-  paginateListDetectMitigationActionsExecutions,
-} from "@aws-sdk/client-iot";
-import { AttachPolicyCommand } from "@aws-sdk/client-iot"; // Importing AWS IoT Client and commands
+  AttachPolicyCommand,
+  DetachPolicyCommand,
+} from "@aws-sdk/client-iot"; // Importing AWS IoT Client and commands
 import middy from "@middy/core";
 import errorLogger from "@middy/error-logger";
 import { onErrorHandler } from "../../../middleware/on-error-handler";
@@ -15,15 +15,18 @@ const iotClient = new IoTClient({ region });
 const prefix = process.env.SERVICE_PREFIX;
 const serviceName = process.env.SERVICE_NAME;
 const stage = process.env.STAGE;
-const policyName = `${serviceName}-${stage}-MyNewIotPolicy`;
-console.log("policyName", policyName);
 
-async function createPolicy() {
-  const topicName =
-    "queue-management-system/dev/service-points/01H0K0EDB8EGAJZ55BVZPT72H1";
-
+async function createPolicy({
+  uri,
+  policyName,
+}: {
+  uri: string;
+  policyName: string;
+}) {
+  const prefix = process.env.SERVICE_PREFIX;
+  const topicName = `${prefix}/${uri}`;
   const topicArn = `arn:aws:iot:${region}:${accountId}:${topicName}`; // replace with your actual topic ARN
-  console.log("topicArn", topicArn);
+
   const policyDocument = {
     Version: "2012-10-17",
     Statement: [
@@ -45,45 +48,65 @@ async function createPolicy() {
     ],
   };
 
-  const params = {
-    policyName: policyName,
-    policyDocument: JSON.stringify(policyDocument), // policyDocument must be a JSON string
-  };
+  const data = await iotClient.send(
+    new CreatePolicyCommand({
+      policyName,
+      policyDocument: JSON.stringify(policyDocument),
+    })
+  );
 
-  try {
-    const data = await iotClient.send(new CreatePolicyCommand(params));
-    console.log("Policy created successfully:", data);
-  } catch (err) {
-    console.error("Error creating policy:", err);
-  }
+  console.log("Policy created successfully:", data);
 }
 
-async function attachPrincipalPolicy() {
-  const principal = "us-east-1:51293a8e-067d-4c68-b62c-07c3180c89d5";
-  const params = {
-    policyName,
-    target: principal,
-  };
-
-  try {
-    const data = await iotClient.send(new AttachPolicyCommand(params));
-    console.log("Policy attached successfully:", data);
-  } catch (err) {
-    console.error("Error attaching policy:", err);
-  }
+async function attachPrincipalPolicy({
+  principal,
+  policyName,
+}: {
+  principal: string;
+  policyName: string;
+}) {
+  const data = await iotClient.send(
+    new AttachPolicyCommand({
+      policyName,
+      target: principal,
+      
+    })
+  );
+  console.log("Policy attached successfully:", data);
 }
 
 export const handler = middy(async () => {
-  // await createPolicy();
-  await attachPrincipalPolicy();
+  const uri = "service-points/01H0K0EDB8EGAJZ55BVZPT72H1";
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify({ message: "Hello World!" }),
-    headers: {
-      "content-type": "application/json",
-    },
-  };
+  const principal = "us-east-1:51293a8e-067d-4c68-b62c-07c3180c89d5";
+
+  // policyName must satisfy regular expression pattern: [\w+=,.@-]+
+  const policyName = `${serviceName}-${stage}-${uri}`.replace(/\//g, "-");
+
+  await createPolicy({ uri, policyName });
+  await attachPrincipalPolicy({
+    principal,
+    policyName,
+  });
+
+  // TODO
+  // check if policy exists
+  // update policy
+  // detach policy from principal
+  // attach policy to principal
 })
   .use(errorLogger())
   .onError(onErrorHandler);
+
+  // The active and previous versions of this policy. Only one version can be active. A policy can have no more than 5 versions. To update a policy with 5 versions, you must first delete one.
+// UPDATE POLICY EXAMPLE
+// const newPolicyDocument = {
+//   //... your updated policy document ...
+// };
+// const policyVersionParams = {
+//   policyName: 'yourPolicyName',
+//   policyDocument: JSON.stringify(newPolicyDocument),
+//   setAsDefault: true // Optional
+// };
+// const createPolicyVersionCommand = new CreatePolicyVersionCommand(policyVersionParams);
+// const response = await client.send(createPolicyVersionCommand);
