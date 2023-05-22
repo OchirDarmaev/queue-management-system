@@ -32,9 +32,9 @@ export const sendUpdatesToBoard = async (event: DynamoDBStreamEvent) => {
   // }
   const messageToSend = await getQueuedInfo();
 
-  const topicPrefix = process.env.TOPIC_PREFIX;
+  const topicPrefix = process.env.SERVICE_PREFIX;
   if (!topicPrefix) {
-    throw new Error("TOPIC_PREFIX is not defined");
+    throw new Error("SERVICE_PREFIX is not defined");
   }
 
   const topicName = `${topicPrefix}/board`;

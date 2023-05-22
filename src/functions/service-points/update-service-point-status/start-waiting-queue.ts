@@ -83,9 +83,9 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
 
   const updatedServicePoint = await getServicePoint({ id: servicePoint.id });
 
-  const topicPrefix = process.env.TOPIC_PREFIX;
+  const topicPrefix = process.env.SERVICE_PREFIX;
   if (!topicPrefix) {
-    throw new Error("TOPIC_PREFIX is not defined");
+    throw new Error("SERVICE_PREFIX is not defined");
   }
 
   const topicName = `${topicPrefix}/service-points/${servicePoint.id}`;
