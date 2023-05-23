@@ -14,8 +14,12 @@ provider:
     USER_POOL_NAME: ${self:service}-${sls:stage}-user-pool
     USER_POOL_CLIENT_NAME: ${self:service}-${sls:stage}-user-pool-client
     USER_POOL_DOMAIN: ${self:service}-${sls:stage}-user-pool-domain
-    TOPIC_PREFIX: ${self:service}/${sls:stage}
+    SERVICE_PREFIX: ${self:service}/${sls:stage}
+    SERVICE_NAME: ${self:service}
+    STAGE: ${sls:stage}
     IDENTITY_POOL_NAME: ${self:service}-${sls:stage}-identity-pool
+    REGION: ${opt:region, self:provider.region, "us-east-1"}
+    ACCOUNT_ID: ${aws:accountId}
 
   httpApi:
     cors: true
@@ -47,6 +51,16 @@ provider:
             - iot:Publish
           Resource:
             - "arn:aws:iot:${opt:region, self:provider.region}:*:topic/${self:service}/${sls:stage}/*"
+        - Effect: Allow
+          Action:
+            - iot:CreatePolicy
+          Resource:
+            - "arn:aws:iot:${opt:region, self:provider.region}:*:policy/${self:service}-${sls:stage}-*"
+        - Effect: Allow
+          Action:
+            - iot:AttachPolicy
+          Resource: "*"
+
 functions:
   #ServicePoint
   createServicePoint:
@@ -102,6 +116,12 @@ functions:
                 NewImage:
                   PK:
                     S: [Q#]
+  permissions:
+    handler: src/functions/service-points/permissions/handler.handler
+    events:
+      - httpApi:
+          method: POST
+          path: /servicePoints/{servicePointId}/permissions
 
   deleteServicePoint:
     handler: src/functions/service-points/delete-service-point/handler.handler

@@ -6,6 +6,11 @@ import { ddbDocClient } from "../../../dynamo-DB-client";
 import { TableName } from "../../../table-name";
 import { getItemsBy } from "../../boards/get-items-by";
 import { EQueueStatus } from "../../queues/enums/queue-status.enum";
+import { getServicePoint } from "../get-service-point/get-service-point";
+import {
+  IoTDataPlaneClient,
+  PublishCommand,
+} from "@aws-sdk/client-iot-data-plane";
 
 export async function startWaitingQueue(servicePoint: ServicePointItem) {
   if (servicePoint.currentQueueItem) {
@@ -75,4 +80,23 @@ export async function startWaitingQueue(servicePoint: ServicePointItem) {
       ],
     })
   );
+
+  const updatedServicePoint = await getServicePoint({ id: servicePoint.id });
+
+  const topicPrefix = process.env.SERVICE_PREFIX;
+  if (!topicPrefix) {
+    throw new Error("SERVICE_PREFIX is not defined");
+  }
+
+  const topicName = `${topicPrefix}/service-points/${servicePoint.id}`;
+  console.debug(`Publishing to topic: ${topicName}`);
+
+  const iotPublishCommand = new PublishCommand({
+    topic: topicName,
+    payload: Buffer.from(JSON.stringify(updatedServicePoint)),
+  });
+  const client = new IoTDataPlaneClient({});
+  const res = await client.send(iotPublishCommand);
+
+  console.debug(`Published to topic: ${topicName}`);
 }
